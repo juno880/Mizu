@@ -29,7 +29,7 @@ android {
     namespace = "eu.kanade.tachiyomi"
 
     defaultConfig {
-        applicationId = "eu.kanade.tachiyomi.sy"
+        applicationId = "eu.kanade.tachiyomi.mizu"
 
         versionCode = 77
         versionName = "1.12.0"
@@ -43,6 +43,10 @@ android {
             abiFilters += supportedAbis
         }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    androidResources {
+        noCompress += listOf("png")
     }
 
     splits {

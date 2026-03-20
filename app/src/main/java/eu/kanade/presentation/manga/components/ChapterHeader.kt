@@ -51,9 +51,7 @@ fun ChapterHeader(
 
 @Composable
 private fun MissingChaptersWarning(count: Int) {
-    if (count == 0) {
         return
-    }
 
     Text(
         text = pluralStringResource(MR.plurals.missing_chapters, count = count, count),
