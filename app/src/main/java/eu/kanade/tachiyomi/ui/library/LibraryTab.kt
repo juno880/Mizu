@@ -13,6 +13,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -57,6 +60,7 @@ import exh.recs.batch.SearchStatus
 import exh.source.MERGED_SOURCE_ID
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -106,6 +110,26 @@ data object LibraryTab : Tab {
         val state by screenModel.state.collectAsState()
 
         val snackbarHostState = remember { SnackbarHostState() }
+
+        // Poll SyncDataJob.isRunning every second to drive the progress indicator
+        val isSyncing by produceState(initialValue = SyncDataJob.isRunning(context)) {
+            while (true) {
+                value = SyncDataJob.isRunning(context)
+                delay(1000L)
+            }
+        }
+
+        // Show tick for 1.5s after sync completes
+        val syncJustFinished = remember { mutableStateOf(false) }
+        val wasSyncing = remember { mutableStateOf(false) }
+        LaunchedEffect(isSyncing) {
+            if (wasSyncing.value && !isSyncing) {
+                syncJustFinished.value = true
+                delay(1500L)
+                syncJustFinished.value = false
+            }
+            wasSyncing.value = isSyncing
+        }
 
         val onClickRefresh: (Category?) -> Boolean = { category ->
             // SY -->
@@ -172,6 +196,8 @@ data object LibraryTab : Tab {
                     onClickSyncExh = screenModel::openFavoritesSyncDialog.takeIf { state.showSyncExh },
                     isSyncEnabled = state.isSyncEnabled,
                     // SY <--
+                    isSyncing = isSyncing,
+                    syncJustFinished = syncJustFinished.value,
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = screenModel::search,
                     // For scroll overlay when no tab
@@ -262,7 +288,13 @@ data object LibraryTab : Tab {
                             screenModel.toggleRangeSelection(category, manga)
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         },
-                        onRefresh = { onClickRefresh(state.activeCategory) },
+                        onRefresh = {
+                    // Also trigger SyncYomi sync on pull to refresh
+                    if (state.isSyncEnabled && !SyncDataJob.isRunning(context)) {
+                        SyncDataJob.startNow(context, manual = true)
+                    }
+                    onClickRefresh(state.activeCategory)
+                },
                         onGlobalSearchClicked = {
                             navigator.push(GlobalSearchScreen(screenModel.state.value.searchQuery ?: ""))
                         },

@@ -1,11 +1,19 @@
 package eu.kanade.presentation.library.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.FlipToBack
 import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,6 +23,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.kanade.presentation.components.AppBar
 import eu.kanade.presentation.components.AppBarActions
@@ -43,6 +52,8 @@ fun LibraryToolbar(
     onClickSyncExh: (() -> Unit)?,
     isSyncEnabled: Boolean,
     // SY <--
+    isSyncing: Boolean,
+    syncJustFinished: Boolean,
     searchQuery: String?,
     onSearchQueryChange: (String?) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
@@ -67,6 +78,8 @@ fun LibraryToolbar(
         onClickSyncExh = onClickSyncExh,
         isSyncEnabled = isSyncEnabled,
         // SY <--
+        isSyncing = isSyncing,
+        syncJustFinished = syncJustFinished,
         scrollBehavior = scrollBehavior,
     )
 }
@@ -86,6 +99,8 @@ private fun LibraryRegularToolbar(
     onClickSyncExh: (() -> Unit)?,
     isSyncEnabled: Boolean,
     // SY <--
+    isSyncing: Boolean,
+    syncJustFinished: Boolean,
     scrollBehavior: TopAppBarScrollBehavior?,
 ) {
     val pillAlpha = if (isSystemInDarkTheme()) 0.12f else 0.08f
@@ -103,6 +118,33 @@ private fun LibraryRegularToolbar(
                         text = "${title.numberOfManga}",
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = pillAlpha),
                         fontSize = 14.sp,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = isSyncing,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = syncJustFinished && !isSyncing,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CheckCircle,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(16.dp),
+                        tint = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
