@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.FilterList
 import androidx.compose.material.icons.outlined.FlipToBack
@@ -54,6 +55,7 @@ fun LibraryToolbar(
     // SY <--
     isSyncing: Boolean,
     syncJustFinished: Boolean,
+    syncFailed: Boolean,
     searchQuery: String?,
     onSearchQueryChange: (String?) -> Unit,
     scrollBehavior: TopAppBarScrollBehavior?,
@@ -80,6 +82,7 @@ fun LibraryToolbar(
         // SY <--
         isSyncing = isSyncing,
         syncJustFinished = syncJustFinished,
+        syncFailed = syncFailed,
         scrollBehavior = scrollBehavior,
     )
 }
@@ -101,6 +104,7 @@ private fun LibraryRegularToolbar(
     // SY <--
     isSyncing: Boolean,
     syncJustFinished: Boolean,
+    syncFailed: Boolean,
     scrollBehavior: TopAppBarScrollBehavior?,
 ) {
     val pillAlpha = if (isSystemInDarkTheme()) 0.12f else 0.08f
@@ -134,7 +138,7 @@ private fun LibraryRegularToolbar(
                     )
                 }
                 AnimatedVisibility(
-                    visible = syncJustFinished && !isSyncing,
+                    visible = syncJustFinished && !isSyncing && !syncFailed,
                     enter = fadeIn(),
                     exit = fadeOut(),
                 ) {
@@ -145,6 +149,20 @@ private fun LibraryRegularToolbar(
                             .padding(start = 8.dp)
                             .size(16.dp),
                         tint = MaterialTheme.colorScheme.primary,
+                    )
+                }
+                AnimatedVisibility(
+                    visible = syncJustFinished && !isSyncing && syncFailed,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Cancel,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .size(16.dp),
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -210,7 +228,7 @@ private fun LibrarySelectionToolbar(
         titleContent = { Text(text = "$selectedCount") },
         actions = {
             AppBarActions(
-                persistentListOf(
+                actions = persistentListOf(
                     AppBar.Action(
                         title = stringResource(MR.strings.action_select_all),
                         icon = Icons.Outlined.SelectAll,

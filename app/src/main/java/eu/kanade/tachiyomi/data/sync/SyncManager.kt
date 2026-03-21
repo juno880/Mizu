@@ -64,11 +64,9 @@ class SyncManager(
 
     /**
      * Syncs data with a sync service.
-     *
-     * This function retrieves local data (favorites, manga, extensions, and categories)
-     * from the database using the BackupManager, then synchronizes the data with a sync service.
+     * Returns true if sync succeeded, false if it failed.
      */
-    suspend fun syncData() {
+    suspend fun syncData(): Boolean {
         // Reset isSyncing in case it was left over or failed syncing during restore.
         handler.await(inTransaction = true) {
             mangasQueries.resetIsSyncing()
@@ -112,13 +110,11 @@ class SyncManager(
         )
         logcat(LogPriority.DEBUG) { "End create backup" }
 
-        // Create the SyncData object
         val syncData = SyncData(
             deviceId = syncPreferences.uniqueDeviceID(),
             backup = backup,
         )
 
-        // Handle sync based on the selected service
         val syncService = when (val syncService = SyncService.fromInt(syncPreferences.syncService().get())) {
             SyncService.SYNCYOMI -> {
                 SyncYomiSyncService(
@@ -143,30 +139,26 @@ class SyncManager(
 
         if (remoteBackup == null) {
             logcat(LogPriority.DEBUG) { "Skip restore due to network issues" }
-            // should we call showSyncError?
-            return
+            notifier.showSyncError("Sync failed - could not connect to server")
+            return false
         }
 
         if (remoteBackup === syncData.backup) {
-            // nothing changed
             logcat(LogPriority.DEBUG) { "Skip restore due to remote was overwrite from local" }
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Sync completed successfully")
-            return
+            return true
         }
 
-        // Stop the sync early if the remote backup is null or empty
         if (remoteBackup.backupManga.size == 0) {
             notifier.showSyncError("No data found on remote server.")
-            return
+            return false
         }
 
-        // Check if it's first sync based on lastSyncTimestamp
         if (syncPreferences.lastSyncTimestamp().get() == 0L && databaseManga.isNotEmpty()) {
-            // It's first sync no need to restore data. (just update remote data)
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Updated remote data successfully")
-            return
+            return true
         }
 
         val (filteredFavorites, nonFavorites) = filterFavoritesAndNonFavorites(remoteBackup)
@@ -185,17 +177,15 @@ class SyncManager(
             // SY <--
         )
 
-        // It's local sync no need to restore data. (just update remote data)
         if (filteredFavorites.isEmpty()) {
-            // update the sync timestamp
             syncPreferences.lastSyncTimestamp().set(Date().time)
             notifier.showSyncSuccess("Sync completed successfully")
-            return
+            return true
         }
 
         val backupUri = writeSyncDataToCache(context, newSyncData)
         logcat(LogPriority.DEBUG) { "Got Backup Uri: $backupUri" }
-        if (backupUri != null) {
+        return if (backupUri != null) {
             BackupRestoreJob.start(
                 context,
                 backupUri,
@@ -207,11 +197,11 @@ class SyncManager(
                     extensionRepoSettings = true,
                 ),
             )
-
-            // update the sync timestamp
             syncPreferences.lastSyncTimestamp().set(Date().time)
+            true
         } else {
             logcat(LogPriority.ERROR) { "Failed to write sync data to file" }
+            false
         }
     }
 
@@ -228,11 +218,6 @@ class SyncManager(
         }
     }
 
-    /**
-     * Retrieves all manga from the local database.
-     *
-     * @return a list of all manga stored in the database
-     */
     private suspend fun getAllMangaFromDB(): List<Manga> {
         return handler.awaitList { mangasQueries.getAllManga(::mapManga) }
     }
@@ -245,17 +230,9 @@ class SyncManager(
         val localChapters = handler.await { chaptersQueries.getChaptersByMangaId(localManga.id, 0).executeAsList() }
         val localCategories = getCategories.await(localManga.id).map { it.order }
 
-        if (areChaptersDifferent(localChapters, remoteManga.chapters)) {
-            return true
-        }
-
-        if (localManga.version != remoteManga.version) {
-            return true
-        }
-
-        if (localCategories.toSet() != remoteManga.categories.toSet()) {
-            return true
-        }
+        if (areChaptersDifferent(localChapters, remoteManga.chapters)) return true
+        if (localManga.version != remoteManga.version) return true
+        if (localCategories.toSet() != remoteManga.categories.toSet()) return true
 
         return false
     }
@@ -264,29 +241,16 @@ class SyncManager(
         val localChapterMap = localChapters.associateBy { it.url }
         val remoteChapterMap = remoteChapters.associateBy { it.url }
 
-        if (localChapterMap.size != remoteChapterMap.size) {
-            return true
-        }
+        if (localChapterMap.size != remoteChapterMap.size) return true
 
         for ((url, localChapter) in localChapterMap) {
             val remoteChapter = remoteChapterMap[url]
-
-            // If a matching remote chapter doesn't exist, or the version numbers are different, consider them different
-            if (remoteChapter == null || localChapter.version != remoteChapter.version) {
-                return true
-            }
+            if (remoteChapter == null || localChapter.version != remoteChapter.version) return true
         }
 
         return false
     }
 
-    /**
-     * Filters the favorite and non-favorite manga from the backup and checks
-     * if the favorite manga is different from the local database.
-     * @param backup the Backup object containing the backup data.
-     * @return a Pair of lists, where the first list contains different favorite manga
-     * and the second list contains non-favorite manga.
-     */
     private suspend fun filterFavoritesAndNonFavorites(backup: Backup): Pair<List<BackupManga>, List<BackupManga>> {
         val favorites = mutableListOf<BackupManga>()
         val nonFavorites = mutableListOf<BackupManga>()
@@ -304,7 +268,6 @@ class SyncManager(
                 val compositeKey = Triple(remoteManga.source, remoteManga.url, remoteManga.title)
                 val localManga = localMangaMap[compositeKey]
                 when {
-                    // Checks if the manga is in favorites and needs updating or adding
                     remoteManga.favorite -> {
                         if (localManga == null || isMangaDifferent(localManga, remoteManga)) {
                             logcat(LogPriority.DEBUG, logTag) { "Adding to favorites: ${remoteManga.title}" }
@@ -313,7 +276,6 @@ class SyncManager(
                             logcat(LogPriority.DEBUG, logTag) { "Already up-to-date favorite: ${remoteManga.title}" }
                         }
                     }
-                    // Handle non-favorites
                     !remoteManga.favorite -> {
                         logcat(LogPriority.DEBUG, logTag) { "Adding to non-favorites: ${remoteManga.title}" }
                         nonFavorites.add(remoteManga)
@@ -332,13 +294,8 @@ class SyncManager(
         return Pair(favorites, nonFavorites)
     }
 
-    /**
-     * Updates the non-favorite manga in the local database with their favorite status from the backup.
-     * @param nonFavorites the list of non-favorite BackupManga objects from the backup.
-     */
     private suspend fun updateNonFavorites(nonFavorites: List<BackupManga>) {
         val localMangaList = getAllMangaFromDB()
-
         val localMangaMap = localMangaList.associateBy { Triple(it.source, it.url, it.title) }
 
         nonFavorites.forEach { nonFavorite ->

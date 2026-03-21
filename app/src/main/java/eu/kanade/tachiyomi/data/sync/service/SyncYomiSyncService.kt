@@ -70,7 +70,6 @@ class SyncYomiSyncService(
                 }
                 mergeSyncData(syncData, remoteData)
             } else {
-                // init or overwrite remote data
                 logcat(LogPriority.DEBUG) {
                     "Try overwrite remote data with ETag($etag)"
                 }
@@ -81,11 +80,11 @@ class SyncYomiSyncService(
 
             if (success) {
                 reportSyncEvent(SyncEventStatus.SYNC_SUCCESS)
+                return finalSyncData.backup
             } else {
                 reportSyncEvent(SyncEventStatus.SYNC_FAILED, "Failed to push sync data")
+                return null
             }
-
-            return finalSyncData.backup
         } catch (e: Exception) {
             if (e is CancellationException) {
                 reportSyncEvent(SyncEventStatus.SYNC_CANCELLED, e.message)
@@ -119,14 +118,12 @@ class SyncYomiSyncService(
         val response = client.newCall(downloadRequest).await()
 
         if (response.code == HttpStatus.SC_NOT_MODIFIED) {
-            // not modified
             assert(lastETag.isNotEmpty())
             logcat(LogPriority.INFO) {
                 "Remote server not modified"
             }
             return Pair(null, lastETag)
         } else if (response.code == HttpStatus.SC_NOT_FOUND) {
-            // maybe got deleted from remote
             return Pair(null, "")
         }
 
@@ -145,8 +142,6 @@ class SyncYomiSyncService(
                 logcat(LogPriority.INFO) {
                     "Bad content responsed from server"
                 }
-                // the body is invalid
-                // return default value so we can overwrite it
                 Pair(null, "")
             }
         } else {
@@ -174,7 +169,6 @@ class SyncYomiSyncService(
         }
         val headers = headersBuilder.build()
 
-        // Set timeout to 30 seconds
         val client = OkHttpClient.Builder()
             .connectTimeout(timeout, TimeUnit.SECONDS)
             .readTimeout(timeout, TimeUnit.SECONDS)
@@ -202,7 +196,6 @@ class SyncYomiSyncService(
             logcat(LogPriority.DEBUG) { "SyncYomi sync completed" }
             return true
         } else if (response.code == HttpStatus.SC_PRECONDITION_FAILED) {
-            // other clients updated remote data, will try next time
             logcat(LogPriority.DEBUG) { "SyncYomi sync failed with 412" }
             return false
         } else {

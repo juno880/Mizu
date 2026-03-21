@@ -199,6 +199,7 @@ dependencies {
 
     // Compose
     implementation(compose.activity)
+    implementation("androidx.compose.runtime:runtime-livedata")
     implementation(compose.foundation)
     implementation(compose.material3.core)
     implementation(compose.material.icons)

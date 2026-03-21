@@ -13,9 +13,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -25,6 +24,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
+import androidx.work.WorkInfo
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
@@ -52,6 +52,7 @@ import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
 import eu.kanade.tachiyomi.util.system.toast
+import eu.kanade.tachiyomi.util.system.workManager
 import exh.favorites.FavoritesSyncStatus
 import exh.recs.RecommendsScreen
 import exh.recs.batch.RecommendationSearchBottomSheetDialog
@@ -111,19 +112,25 @@ data object LibraryTab : Tab {
 
         val snackbarHostState = remember { SnackbarHostState() }
 
-        // Poll SyncDataJob.isRunning every second to drive the progress indicator
-        val isSyncing by produceState(initialValue = SyncDataJob.isRunning(context)) {
-            while (true) {
-                value = SyncDataJob.isRunning(context)
-                delay(1000L)
-            }
-        }
+        // Observe WorkManager state for sync job directly
+        val workInfos by context.workManager
+            .getWorkInfosByTagLiveData(SyncDataJob.TAG_MANUAL)
+            .observeAsState()
 
-        // Show tick for 1.5s after sync completes
+        val isSyncing = workInfos?.any { it.state == WorkInfo.State.RUNNING } == true
+
         val syncJustFinished = remember { mutableStateOf(false) }
+        val syncFailed = remember { mutableStateOf(false) }
         val wasSyncing = remember { mutableStateOf(false) }
+
         LaunchedEffect(isSyncing) {
             if (wasSyncing.value && !isSyncing) {
+                // Read result from the completed work
+                val lastWork = workInfos?.lastOrNull {
+                    it.state == WorkInfo.State.SUCCEEDED &&
+                        it.outputData.keyValueMap.containsKey(SyncDataJob.KEY_SYNC_FAILED)
+                }
+                syncFailed.value = lastWork?.outputData?.getBoolean(SyncDataJob.KEY_SYNC_FAILED, false) ?: false
                 syncJustFinished.value = true
                 delay(1500L)
                 syncJustFinished.value = false
@@ -132,7 +139,6 @@ data object LibraryTab : Tab {
         }
 
         val onClickRefresh: (Category?) -> Boolean = { category ->
-            // SY -->
             val started = LibraryUpdateJob.startNow(
                 context = context,
                 category = if (state.groupType == LibraryGroup.BY_DEFAULT) category else null,
@@ -144,7 +150,6 @@ data object LibraryTab : Tab {
                     else -> null
                 },
             )
-            // SY <--
             scope.launch {
                 val msgRes = when {
                     !started -> MR.strings.update_already_running
@@ -192,15 +197,13 @@ data object LibraryTab : Tab {
                             context.toast(SYMR.strings.sync_in_progress)
                         }
                     },
-                    // SY -->
                     onClickSyncExh = screenModel::openFavoritesSyncDialog.takeIf { state.showSyncExh },
                     isSyncEnabled = state.isSyncEnabled,
-                    // SY <--
                     isSyncing = isSyncing,
                     syncJustFinished = syncJustFinished.value,
+                    syncFailed = syncFailed.value,
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = screenModel::search,
-                    // For scroll overlay when no tab
                     scrollBehavior = scrollBehavior.takeIf { !state.showCategoryTabs },
                 )
             },
@@ -215,26 +218,19 @@ data object LibraryTab : Tab {
                     onDeleteClicked = screenModel::openDeleteMangaDialog,
                     onMigrateClicked = {
                         val selection = state.selectedManga
-                            // SY -->
                             .filterNot { it.source == MERGED_SOURCE_ID }
                             .map { it.id }
-                        // <-- SY
                         screenModel.clearSelection()
-                        /* SY --> */if (selection.isNotEmpty()) {
-                            /* <-- SY */
+                        if (selection.isNotEmpty()) {
                             navigator.push(MigrationConfigScreen(selection))
-                            // SY ->>
                         } else {
                             context.toast(SYMR.strings.no_valid_entry)
                         }
-                        // <-- SY
                     },
-                    // SY -->
                     onClickCleanTitles = screenModel::cleanTitles.takeIf { state.showCleanTitles },
                     onClickCollectRecommendations = screenModel::showRecommendationSearchDialog.takeIf { state.selection.size > 1 },
                     onClickAddToMangaDex = screenModel::syncMangaToDex.takeIf { state.showAddToMangadex },
                     onClickResetInfo = screenModel::resetInfo.takeIf { state.showResetInfo },
-                    // SY <--
                 )
             },
             snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -289,12 +285,8 @@ data object LibraryTab : Tab {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         },
                         onRefresh = {
-                    // Also trigger SyncYomi sync on pull to refresh
-                    if (state.isSyncEnabled && !SyncDataJob.isRunning(context)) {
-                        SyncDataJob.startNow(context, manual = true)
-                    }
-                    onClickRefresh(state.activeCategory)
-                },
+                            onClickRefresh(state.activeCategory)
+                        },
                         onGlobalSearchClicked = {
                             navigator.push(GlobalSearchScreen(screenModel.state.value.searchQuery ?: ""))
                         },
@@ -314,9 +306,7 @@ data object LibraryTab : Tab {
                     onDismissRequest = onDismissRequest,
                     screenModel = settingsScreenModel,
                     category = state.activeCategory,
-                    // SY -->
                     hasCategories = state.libraryData.categories.fastAny { !it.isSystemCategory },
-                    // SY <--
                 )
             }
 
@@ -345,7 +335,7 @@ data object LibraryTab : Tab {
                     },
                 )
             }
-            // SY -->
+
             LibraryScreenModel.Dialog.SyncFavoritesWarning -> {
                 SyncFavoritesWarningDialog(
                     onDismissRequest = onDismissRequest,
@@ -376,11 +366,10 @@ data object LibraryTab : Tab {
                     },
                 )
             }
-            // SY <--
+
             null -> {}
         }
 
-        // SY -->
         SyncFavoritesProgressDialog(
             status = screenModel.favoritesSync.status.collectAsState().value,
             setStatusIdle = { screenModel.favoritesSync.status.value = FavoritesSyncStatus.Idle },
@@ -392,7 +381,6 @@ data object LibraryTab : Tab {
             setStatusIdle = { screenModel.recommendationSearch.status.value = SearchStatus.Idle },
             setStatusCancelling = { screenModel.recommendationSearch.status.value = SearchStatus.Cancelling },
         )
-        // SY <--
 
         BackHandler(enabled = state.selectionMode || state.searchQuery != null) {
             when {
@@ -411,7 +399,6 @@ data object LibraryTab : Tab {
             }
         }
 
-        // SY -->
         val recSearchState by screenModel.recommendationSearch.status.collectAsState()
         LaunchedEffect(recSearchState) {
             when (val current = recSearchState) {
@@ -419,24 +406,19 @@ data object LibraryTab : Tab {
                     RecommendsScreen.Args.MergedSourceMangas(current.results)
                         .let(::RecommendsScreen)
                         .let(navigator::push)
-
                     screenModel.recommendationSearch.status.value = SearchStatus.Idle
                 }
-
                 is SearchStatus.Finished.WithoutResults -> {
                     context.toast(SYMR.strings.rec_no_results)
                     screenModel.recommendationSearch.status.value = SearchStatus.Idle
                 }
-
                 is SearchStatus.Cancelling -> {
                     screenModel.cancelRecommendationSearch()
                     screenModel.recommendationSearch.status.value = SearchStatus.Idle
                 }
-
                 else -> {}
             }
         }
-        // SY <--
 
         LaunchedEffect(Unit) {
             launch { queryEvent.receiveAsFlow().collect(screenModel::search) }
@@ -444,11 +426,9 @@ data object LibraryTab : Tab {
         }
     }
 
-    // For invoking search from other screen
     private val queryEvent = Channel<String>()
     suspend fun search(query: String) = queryEvent.send(query)
 
-    // For opening settings sheet in LibraryController
     private val requestSettingsSheetEvent = Channel<Unit>()
     private suspend fun requestOpenSettingsSheet() = requestSettingsSheetEvent.send(Unit)
 }

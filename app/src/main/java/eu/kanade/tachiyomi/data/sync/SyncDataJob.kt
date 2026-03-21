@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.work.CoroutineWorker
+import androidx.work.Data
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
@@ -35,7 +36,6 @@ class SyncDataJob(private val context: Context, workerParams: WorkerParameters) 
             if (!context.isOnline()) {
                 return Result.retry()
             }
-            // Find a running manual worker. If exists, try again later
             if (context.workManager.isRunning(TAG_MANUAL)) {
                 return Result.retry()
             }
@@ -44,12 +44,20 @@ class SyncDataJob(private val context: Context, workerParams: WorkerParameters) 
         setForegroundSafely()
 
         return try {
-            SyncManager(context).syncData()
-            Result.success()
+            val success = SyncManager(context).syncData()
+            Result.success(
+                Data.Builder()
+                    .putBoolean(KEY_SYNC_FAILED, !success)
+                    .build(),
+            )
         } catch (e: Exception) {
             logcat(LogPriority.ERROR, e)
             notifier.showSyncError(e.message)
-            Result.success() // try again next time
+            Result.success(
+                Data.Builder()
+                    .putBoolean(KEY_SYNC_FAILED, true)
+                    .build(),
+            )
         } finally {
             context.cancelNotification(Notifications.ID_RESTORE_PROGRESS)
         }
@@ -71,6 +79,7 @@ class SyncDataJob(private val context: Context, workerParams: WorkerParameters) 
         private const val TAG_JOB = "SyncDataJob"
         private const val TAG_AUTO = "$TAG_JOB:auto"
         const val TAG_MANUAL = "$TAG_JOB:manual"
+        const val KEY_SYNC_FAILED = "sync_failed"
 
         fun isRunning(context: Context): Boolean {
             return context.workManager.isRunning(TAG_JOB)
@@ -100,7 +109,6 @@ class SyncDataJob(private val context: Context, workerParams: WorkerParameters) 
         fun startNow(context: Context, manual: Boolean = false) {
             val wm = context.workManager
             if (wm.isRunning(TAG_JOB)) {
-                // Already running either as a scheduled or manual job
                 return
             }
             val tag = if (manual) TAG_MANUAL else TAG_AUTO
@@ -117,11 +125,8 @@ class SyncDataJob(private val context: Context, workerParams: WorkerParameters) 
                 .addStates(listOf(WorkInfo.State.RUNNING))
                 .build()
             wm.getWorkInfos(workQuery).get()
-                // Should only return one work but just in case
                 .forEach {
                     wm.cancelWorkById(it.id)
-
-                    // Re-enqueue cancelled scheduled work
                     if (it.tags.contains(TAG_AUTO)) {
                         setupTask(context)
                     }

@@ -12,6 +12,7 @@ class SyncPreferences(
     fun clientHost() = preferenceStore.getString("sync_client_host", "https://sync.tachiyomi.org")
     fun clientAPIKey() = preferenceStore.getString("sync_client_api_key", "")
     fun lastSyncTimestamp() = preferenceStore.getLong(Preference.appStateKey("last_sync_timestamp"), 0L)
+    fun lastSyncFailed() = preferenceStore.getBoolean("last_sync_failed", false)
 
     fun lastSyncEtag() = preferenceStore.getString("sync_etag", "")
 
@@ -31,7 +32,6 @@ class SyncPreferences(
     fun uniqueDeviceID(): String {
         val uniqueIDPreference = preferenceStore.getString(Preference.appStateKey("unique_device_id"), "")
 
-        // Retrieve the current value of the preference
         var uniqueID = uniqueIDPreference.get()
         if (uniqueID.isBlank()) {
             uniqueID = UUID.randomUUID().toString()
