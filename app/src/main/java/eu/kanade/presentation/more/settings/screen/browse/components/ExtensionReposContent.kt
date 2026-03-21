@@ -16,6 +16,7 @@ import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -31,10 +32,12 @@ import tachiyomi.presentation.core.i18n.stringResource
 @Composable
 fun ExtensionReposContent(
     repos: ImmutableSet<ExtensionRepo>,
+    disabledRepos: ImmutableSet<String>,
     lazyListState: LazyListState,
     paddingValues: PaddingValues,
     onOpenWebsite: (ExtensionRepo) -> Unit,
     onClickDelete: (String) -> Unit,
+    onToggleRepo: (String, Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
@@ -48,8 +51,10 @@ fun ExtensionReposContent(
                 ExtensionRepoListItem(
                     modifier = Modifier.animateItem(),
                     repo = it,
+                    enabled = it.baseUrl !in disabledRepos,
                     onOpenWebsite = { onOpenWebsite(it) },
                     onDelete = { onClickDelete(it.baseUrl) },
+                    onToggle = { enabled -> onToggleRepo(it.baseUrl, enabled) },
                 )
             }
         }
@@ -59,8 +64,10 @@ fun ExtensionReposContent(
 @Composable
 private fun ExtensionRepoListItem(
     repo: ExtensionRepo,
+    enabled: Boolean,
     onOpenWebsite: () -> Unit,
     onDelete: () -> Unit,
+    onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -81,8 +88,14 @@ private fun ExtensionRepoListItem(
             Icon(imageVector = Icons.AutoMirrored.Outlined.Label, contentDescription = null)
             Text(
                 text = repo.name,
-                modifier = Modifier.padding(start = MaterialTheme.padding.medium),
+                modifier = Modifier
+                    .padding(start = MaterialTheme.padding.medium)
+                    .weight(1f),
                 style = MaterialTheme.typography.titleMedium,
+            )
+            Switch(
+                checked = enabled,
+                onCheckedChange = onToggle,
             )
         }
 

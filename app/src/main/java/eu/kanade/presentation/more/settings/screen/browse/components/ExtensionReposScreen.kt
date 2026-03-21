@@ -1,5 +1,4 @@
 @file:JvmName("ExtensionReposScreenKt")
-
 package eu.kanade.presentation.more.settings.screen.browse.components
 
 import androidx.compose.foundation.layout.PaddingValues
@@ -31,6 +30,7 @@ fun ExtensionReposScreen(
     onOpenWebsite: (ExtensionRepo) -> Unit,
     onClickDelete: (String) -> Unit,
     onClickRefresh: () -> Unit,
+    onToggleRepo: (String, Boolean) -> Unit,
     navigateUp: () -> Unit,
 ) {
     val lazyListState = rememberLazyListState()
@@ -64,14 +64,15 @@ fun ExtensionReposScreen(
             )
             return@Scaffold
         }
-
         ExtensionReposContent(
             repos = state.repos,
+            disabledRepos = state.disabledRepos,
             lazyListState = lazyListState,
             paddingValues = paddingValues + topSmallPaddingValues +
                 PaddingValues(horizontal = MaterialTheme.padding.medium),
             onOpenWebsite = onOpenWebsite,
             onClickDelete = onClickDelete,
+            onToggleRepo = onToggleRepo,
         )
     }
 }

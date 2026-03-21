@@ -14,6 +14,7 @@ import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.transformations
 import coil3.transform.CircleCropTransformation
+import eu.kanade.domain.notification.NotificationPreferences
 import eu.kanade.presentation.util.formatChapterNumber
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
@@ -49,6 +50,7 @@ class LibraryUpdateNotifier(
 
     private val securityPreferences: SecurityPreferences = Injekt.get(),
     private val sourceManager: SourceManager = Injekt.get(),
+    private val notificationPreferences: NotificationPreferences = Injekt.get(),
 ) {
 
     private val percentFormatter = NumberFormat.getPercentInstance().apply {
@@ -56,23 +58,14 @@ class LibraryUpdateNotifier(
         maximumFractionDigits = 0
     }
 
-    /**
-     * Pending intent of action that cancels the library update
-     */
     private val cancelIntent by lazy {
         NotificationReceiver.cancelLibraryUpdatePendingBroadcast(context)
     }
 
-    /**
-     * Bitmap of the app for notifications.
-     */
     private val notificationBitmap by lazy {
         BitmapFactory.decodeResource(context.resources, R.mipmap.ic_launcher)
     }
 
-    /**
-     * Cached progress notification to avoid creating a lot.
-     */
     val progressNotificationBuilder by lazy {
         context.notificationBuilder(Notifications.CHANNEL_LIBRARY_PROGRESS) {
             setContentTitle(context.stringResource(MR.strings.app_name))
@@ -84,14 +77,9 @@ class LibraryUpdateNotifier(
         }
     }
 
-    /**
-     * Shows the notification containing the currently updating manga and the progress.
-     *
-     * @param manga the manga that are being updated.
-     * @param current the current progress.
-     * @param total the total progress.
-     */
     fun showProgressNotification(manga: List<Manga>, current: Int, total: Int) {
+        if (!notificationPreferences.showLibraryProgressNotification().get()) return
+
         progressNotificationBuilder
             .setContentTitle(
                 context.stringResource(
@@ -113,10 +101,9 @@ class LibraryUpdateNotifier(
         )
     }
 
-    /**
-     * Warn when excessively checking any single source.
-     */
     fun showQueueSizeWarningNotificationIfNeeded(mangaToUpdate: List<LibraryManga>) {
+        if (!notificationPreferences.showLibraryProgressNotification().get()) return
+
         val maxUpdatesFromSource = mangaToUpdate
             .groupBy { it.manga.source }
             .filterKeys { sourceManager.get(it) !is UnmeteredSource }
@@ -140,16 +127,9 @@ class LibraryUpdateNotifier(
         }
     }
 
-    /**
-     * Shows notification containing update entries that failed with action to open full log.
-     *
-     * @param failed Number of entries that failed to update.
-     * @param uri Uri for error log file containing all titles that failed.
-     */
     fun showUpdateErrorNotification(failed: Int, uri: Uri) {
-        if (failed == 0) {
-            return
-        }
+        if (!notificationPreferences.showLibraryErrorNotification().get()) return
+        if (failed == 0) return
 
         context.notify(
             Notifications.ID_LIBRARY_ERROR,
@@ -158,18 +138,13 @@ class LibraryUpdateNotifier(
             setContentTitle(context.stringResource(MR.strings.notification_update_error, failed))
             setContentText(context.stringResource(MR.strings.action_show_errors))
             setSmallIcon(R.drawable.ic_tachi)
-
             setContentIntent(NotificationReceiver.openErrorLogPendingActivity(context, uri))
         }
     }
 
-    /**
-     * Shows the notification containing the result of the update done by the service.
-     *
-     * @param updates a list of manga with new updates.
-     */
     fun showUpdateNotifications(updates: List<Pair<Manga, Array<Chapter>>>) {
-        // Parent group notification
+        if (!notificationPreferences.showNewChaptersNotification().get()) return
+
         context.notify(
             Notifications.ID_NEW_CHAPTERS,
             Notifications.CHANNEL_NEW_CHAPTERS,
@@ -209,7 +184,6 @@ class LibraryUpdateNotifier(
             setAutoCancel(true)
         }
 
-        // Per-manga notification
         if (!securityPreferences.hideNotificationContent().get()) {
             launchUI {
                 context.notify(
@@ -243,11 +217,9 @@ class LibraryUpdateNotifier(
             setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_SUMMARY)
             priority = NotificationCompat.PRIORITY_HIGH
 
-            // Open first chapter on tap
             setContentIntent(NotificationReceiver.openChapterPendingActivity(context, manga, chapters.first()))
             setAutoCancel(true)
 
-            // Mark chapters as read action
             addAction(
                 R.drawable.ic_done_24dp,
                 context.stringResource(MR.strings.action_mark_as_read),
@@ -258,7 +230,6 @@ class LibraryUpdateNotifier(
                     Notifications.ID_NEW_CHAPTERS,
                 ),
             )
-            // View chapters action
             addAction(
                 R.drawable.ic_book_24dp,
                 context.stringResource(MR.strings.action_view_chapters),
@@ -268,8 +239,6 @@ class LibraryUpdateNotifier(
                     Notifications.ID_NEW_CHAPTERS,
                 ),
             )
-            // Download chapters action
-            // Only add the action when chapters is within threshold
             if (chapters.size <= Downloader.CHAPTERS_PER_SOURCE_QUEUE_WARNING_THRESHOLD) {
                 addAction(
                     android.R.drawable.stat_sys_download_done,
@@ -285,9 +254,6 @@ class LibraryUpdateNotifier(
         }.build()
     }
 
-    /**
-     * Cancels the progress notification.
-     */
     fun cancelProgressNotification() {
         context.cancelNotification(Notifications.ID_LIBRARY_PROGRESS)
     }
@@ -310,26 +276,21 @@ class LibraryUpdateNotifier(
             .toSet()
 
         return when (displayableChapterNumbers.size) {
-            // No sensible chapter numbers to show (i.e. no chapters have parsed chapter number)
             0 -> {
-                // "1 new chapter" or "5 new chapters"
                 context.pluralStringResource(
                     MR.plurals.notification_chapters_generic,
                     chapters.size,
                     chapters.size,
                 )
             }
-            // Only 1 chapter has a parsed chapter number
             1 -> {
                 val remaining = chapters.size - displayableChapterNumbers.size
                 if (remaining == 0) {
-                    // "Chapter 2.5"
                     context.stringResource(
                         MR.strings.notification_chapters_single,
                         displayableChapterNumbers.first(),
                     )
                 } else {
-                    // "Chapter 2.5 and 10 more"
                     context.stringResource(
                         MR.strings.notification_chapters_single_and_more,
                         displayableChapterNumbers.first(),
@@ -337,11 +298,9 @@ class LibraryUpdateNotifier(
                     )
                 }
             }
-            // Everything else (i.e. multiple parsed chapter numbers)
             else -> {
                 val shouldTruncate = displayableChapterNumbers.size > NOTIF_MAX_CHAPTERS
                 if (shouldTruncate) {
-                    // "Chapters 1, 2.5, 3, 4, 5 and 10 more"
                     val remaining = displayableChapterNumbers.size - NOTIF_MAX_CHAPTERS
                     val joinedChapterNumbers = displayableChapterNumbers
                         .take(NOTIF_MAX_CHAPTERS)
@@ -353,7 +312,6 @@ class LibraryUpdateNotifier(
                         remaining,
                     )
                 } else {
-                    // "Chapters 1, 2.5, 3"
                     context.stringResource(
                         MR.strings.notification_chapters_multiple,
                         displayableChapterNumbers.joinToString(", "),
@@ -363,9 +321,6 @@ class LibraryUpdateNotifier(
         }
     }
 
-    /**
-     * Returns an intent to open the main activity.
-     */
     private fun getNotificationIntent(): PendingIntent {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

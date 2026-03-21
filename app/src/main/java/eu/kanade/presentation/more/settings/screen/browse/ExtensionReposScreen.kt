@@ -28,7 +28,6 @@ class ExtensionReposScreen(
     override fun Content() {
         val context = LocalContext.current
         val navigator = LocalNavigator.currentOrThrow
-
         val screenModel = rememberScreenModel { ExtensionReposScreenModel() }
         val state by screenModel.state.collectAsState()
 
@@ -49,6 +48,7 @@ class ExtensionReposScreen(
             onOpenWebsite = { context.openInBrowser(it.website) },
             onClickDelete = { screenModel.showDialog(RepoDialog.Delete(it)) },
             onClickRefresh = { screenModel.refreshRepos() },
+            onToggleRepo = { baseUrl, enabled -> screenModel.toggleRepo(baseUrl, enabled) },
             navigateUp = navigator::pop,
         )
 

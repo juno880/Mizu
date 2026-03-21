@@ -58,6 +58,8 @@ class SourcePreferences(
         false,
     )
 
+    fun disabledRepos() = preferenceStore.getStringSet("disabled_extension_repos", emptySet())
+
     // SY -->
     fun enableSourceBlacklist() = preferenceStore.getBoolean("eh_enable_source_blacklist", true)
 

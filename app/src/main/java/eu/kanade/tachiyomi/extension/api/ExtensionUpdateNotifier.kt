@@ -2,6 +2,7 @@ package eu.kanade.tachiyomi.extension.api
 
 import android.content.Context
 import androidx.core.app.NotificationCompat
+import eu.kanade.domain.notification.NotificationPreferences
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
@@ -16,8 +17,11 @@ import uy.kohesive.injekt.api.get
 class ExtensionUpdateNotifier(
     private val context: Context,
     private val securityPreferences: SecurityPreferences = Injekt.get(),
+    private val notificationPreferences: NotificationPreferences = Injekt.get(),
 ) {
     fun promptUpdates(names: List<String>) {
+        if (!notificationPreferences.showExtensionUpdateNotification().get()) return
+
         context.notify(
             Notifications.ID_UPDATES_TO_EXTS,
             Notifications.CHANNEL_EXTENSIONS_UPDATE,

@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import com.hippo.unifile.UniFile
+import eu.kanade.domain.notification.NotificationPreferences
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.core.security.SecurityPreferences
 import eu.kanade.tachiyomi.data.notification.NotificationReceiver
@@ -23,6 +24,7 @@ import java.util.concurrent.TimeUnit
 class BackupNotifier(private val context: Context) {
 
     private val preferences: SecurityPreferences by injectLazy()
+    private val notificationPreferences: NotificationPreferences by injectLazy()
 
     private val progressNotificationBuilder = context.notificationBuilder(
         Notifications.CHANNEL_BACKUP_RESTORE_PROGRESS,
@@ -47,29 +49,32 @@ class BackupNotifier(private val context: Context) {
     }
 
     fun showBackupProgress(): NotificationCompat.Builder {
+        if (!notificationPreferences.showBackupRestoreNotification().get()) return progressNotificationBuilder
+
         val builder = with(progressNotificationBuilder) {
             setContentTitle(context.stringResource(MR.strings.creating_backup))
-
             setProgress(0, 0, true)
         }
 
         builder.show(Notifications.ID_BACKUP_PROGRESS)
-
         return builder
     }
 
     fun showBackupError(error: String?) {
+        if (!notificationPreferences.showBackupRestoreNotification().get()) return
+
         context.cancelNotification(Notifications.ID_BACKUP_PROGRESS)
 
         with(completeNotificationBuilder) {
             setContentTitle(context.stringResource(MR.strings.creating_backup_error))
             setContentText(error)
-
             show(Notifications.ID_BACKUP_COMPLETE)
         }
     }
 
     fun showBackupComplete(file: UniFile) {
+        if (!notificationPreferences.showBackupRestoreNotification().get()) return
+
         context.cancelNotification(Notifications.ID_BACKUP_PROGRESS)
 
         with(completeNotificationBuilder) {
@@ -93,6 +98,8 @@ class BackupNotifier(private val context: Context) {
         maxAmount: Int = 100,
         sync: Boolean = false,
     ): NotificationCompat.Builder {
+        if (!notificationPreferences.showBackupRestoreNotification().get()) return progressNotificationBuilder
+
         val builder = with(progressNotificationBuilder) {
             val contentTitle = if (sync) {
                 context.stringResource(MR.strings.syncing_library)
@@ -117,17 +124,17 @@ class BackupNotifier(private val context: Context) {
         }
 
         builder.show(Notifications.ID_RESTORE_PROGRESS)
-
         return builder
     }
 
     fun showRestoreError(error: String?) {
+        if (!notificationPreferences.showBackupRestoreNotification().get()) return
+
         context.cancelNotification(Notifications.ID_RESTORE_PROGRESS)
 
         with(completeNotificationBuilder) {
             setContentTitle(context.stringResource(MR.strings.restoring_backup_error))
             setContentText(error)
-
             show(Notifications.ID_RESTORE_COMPLETE)
         }
     }
@@ -139,6 +146,8 @@ class BackupNotifier(private val context: Context) {
         file: String?,
         sync: Boolean,
     ) {
+        if (!notificationPreferences.showBackupRestoreNotification().get()) return
+
         val contentTitle = if (sync) {
             context.stringResource(MR.strings.library_sync_complete)
         } else {

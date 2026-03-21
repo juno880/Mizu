@@ -221,6 +221,7 @@
     <string name="pref_browse_summary">Sources, extensions, global search</string>
     <string name="pref_backup_summary">Manual &amp; automatic backups, storage space</string>
     <string name="pref_security_summary">App lock, secure screen</string>
+    <string name="pref_notifications_summary">New chapters, downloads, backup</string>
     <string name="pref_advanced_summary">Dump crash logs, battery optimizations</string>
 
       <!-- General section -->
@@ -253,6 +254,7 @@
     <string name="pref_app_language">App language</string>
 
     <string name="pref_category_security">Security and privacy</string>
+    <string name="pref_category_notifications">Notifications</string>
     <string name="pref_security">Security</string>
     <string name="pref_firebase">Analytics and Crash logs</string>
 

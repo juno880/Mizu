@@ -4,11 +4,13 @@ import androidx.compose.runtime.Immutable
 import cafe.adriel.voyager.core.model.StateScreenModel
 import cafe.adriel.voyager.core.model.screenModelScope
 import dev.icerock.moko.resources.StringResource
+import eu.kanade.domain.source.service.SourcePreferences
 import eu.kanade.tachiyomi.extension.ExtensionManager
 import kotlinx.collections.immutable.ImmutableSet
 import kotlinx.collections.immutable.toImmutableSet
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.update
 import mihon.domain.extensionrepo.interactor.CreateExtensionRepo
@@ -29,6 +31,7 @@ class ExtensionReposScreenModel(
     private val replaceExtensionRepo: ReplaceExtensionRepo = Injekt.get(),
     private val updateExtensionRepo: UpdateExtensionRepo = Injekt.get(),
     private val extensionManager: ExtensionManager = Injekt.get(),
+    private val sourcePreferences: SourcePreferences = Injekt.get(),
 ) : StateScreenModel<RepoScreenState>(RepoScreenState.Loading) {
 
     private val _events: Channel<RepoEvent> = Channel(Int.MAX_VALUE)
@@ -36,22 +39,20 @@ class ExtensionReposScreenModel(
 
     init {
         screenModelScope.launchIO {
-            getExtensionRepo.subscribeAll()
-                .collectLatest { repos ->
-                    mutableState.update {
-                        RepoScreenState.Success(
-                            repos = repos.toImmutableSet(),
-                        )
-                    }
-                }
+            combine(
+                getExtensionRepo.subscribeAll(),
+                sourcePreferences.disabledRepos().changes(),
+            ) { repos, disabledRepos ->
+                RepoScreenState.Success(
+                    repos = repos.toImmutableSet(),
+                    disabledRepos = disabledRepos.toImmutableSet(),
+                )
+            }.collectLatest { state ->
+                mutableState.update { state }
+            }
         }
     }
 
-    /**
-     * Creates and adds a new repo to the database.
-     *
-     * @param baseUrl The baseUrl of the repo to create.
-     */
     fun createRepo(baseUrl: String) {
         screenModelScope.launchIO {
             when (val result = createExtensionRepo.await(baseUrl)) {
@@ -66,23 +67,14 @@ class ExtensionReposScreenModel(
         }
     }
 
-    /**
-     * Inserts a repo to the database, replace a matching repo with the same signing key fingerprint if found.
-     *
-     * @param newRepo The repo to insert
-     */
     fun replaceRepo(newRepo: ExtensionRepo) {
         screenModelScope.launchIO {
             replaceExtensionRepo.await(newRepo)
         }
     }
 
-    /**
-     * Refreshes information for each repository.
-     */
     fun refreshRepos() {
         val status = state.value
-
         if (status is RepoScreenState.Success) {
             screenModelScope.launchIO {
                 updateExtensionRepo.awaitAll()
@@ -90,12 +82,22 @@ class ExtensionReposScreenModel(
         }
     }
 
-    /**
-     * Deletes the given repo from the database
-     */
     fun deleteRepo(baseUrl: String) {
         screenModelScope.launchIO {
             deleteExtensionRepo.await(baseUrl)
+            extensionManager.findAvailableExtensions()
+        }
+    }
+
+    fun toggleRepo(baseUrl: String, enabled: Boolean) {
+        screenModelScope.launchIO {
+            val disabled = sourcePreferences.disabledRepos().get().toMutableSet()
+            if (enabled) {
+                disabled.remove(baseUrl)
+            } else {
+                disabled.add(baseUrl)
+            }
+            sourcePreferences.disabledRepos().set(disabled)
             extensionManager.findAvailableExtensions()
         }
     }
@@ -140,6 +142,7 @@ sealed class RepoScreenState {
     @Immutable
     data class Success(
         val repos: ImmutableSet<ExtensionRepo>,
+        val disabledRepos: ImmutableSet<String> = kotlinx.collections.immutable.persistentSetOf(),
         val oldRepos: ImmutableSet<String>? = null,
         val dialog: RepoDialog? = null,
     ) : RepoScreenState() {

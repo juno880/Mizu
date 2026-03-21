@@ -37,8 +37,8 @@ internal class ExtensionApi {
 
     // SY -->
     private val sourcePreferences: SourcePreferences by injectLazy()
-
     // SY <--
+
     private val json: Json by injectLazy()
 
     private val lastExtCheck: Preference<Long> by lazy {
@@ -47,7 +47,9 @@ internal class ExtensionApi {
 
     suspend fun findExtensions(): List<Extension.Available> {
         return withIOContext {
+            val disabledRepos = sourcePreferences.disabledRepos().get()
             getExtensionRepo.getAll()
+                .filter { it.baseUrl !in disabledRepos }
                 .map { async { getExtensions(it) } }
                 .awaitAll()
                 .flatten()
