@@ -152,8 +152,8 @@ object SettingsAppearanceScreen : SearchableSettings {
                     ),
                 ),
                 Preference.PreferenceItem.SwitchPreference(
-                    preference = uiPreferences.imagesInDescription(),
-                    title = stringResource(MR.strings.pref_display_images_description),
+                    preference = uiPreferences.showNavFollowing(),
+                    title = "Show Following tab",
                 ),
             ),
         )

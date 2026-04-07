@@ -66,6 +66,8 @@ class UiPreferences(
 
     fun showNavHistory() = preferenceStore.getBoolean("pref_show_history_button", true)
 
+    fun showNavFollowing() = preferenceStore.getBoolean("pref_show_following_button", false)
+
     // SY <--
 
     companion object {

@@ -1,4 +1,4 @@
-package eu.kanade.tachiyomi.ui.library
+package eu.kanade.tachiyomi.ui.following
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.graphics.res.animatedVectorResource
@@ -7,63 +7,54 @@ import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
+import eu.kanade.presentation.manga.components.ManageTagsDialog
+import kotlinx.collections.immutable.persistentListOf
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import eu.kanade.tachiyomi.util.system.toast
+import exh.recs.RecommendsScreen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import eu.kanade.presentation.manga.components.ManageTagsDialog
-import kotlinx.collections.immutable.persistentListOf
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.util.fastAll
-import androidx.compose.ui.util.fastAny
-import androidx.work.WorkInfo
 import cafe.adriel.voyager.core.model.rememberScreenModel
 import cafe.adriel.voyager.navigator.LocalNavigator
 import cafe.adriel.voyager.navigator.Navigator
 import cafe.adriel.voyager.navigator.currentOrThrow
 import cafe.adriel.voyager.navigator.tab.LocalTabNavigator
 import cafe.adriel.voyager.navigator.tab.TabOptions
+import eu.kanade.core.preference.asState
+import eu.kanade.domain.ui.UiPreferences
 import eu.kanade.presentation.category.components.ChangeCategoryDialog
 import eu.kanade.presentation.library.DeleteLibraryMangaDialog
 import eu.kanade.presentation.library.LibrarySettingsDialog
 import eu.kanade.presentation.library.components.LibraryContent
 import eu.kanade.presentation.library.components.LibraryToolbar
-import eu.kanade.presentation.library.components.SyncFavoritesConfirmDialog
-import eu.kanade.presentation.library.components.SyncFavoritesProgressDialog
-import eu.kanade.presentation.library.components.SyncFavoritesWarningDialog
 import eu.kanade.presentation.manga.components.LibraryBottomActionMenu
-import eu.kanade.presentation.more.onboarding.GETTING_STARTED_URL
 import eu.kanade.presentation.util.Tab
 import eu.kanade.tachiyomi.R
 import eu.kanade.tachiyomi.data.library.LibraryUpdateJob
-import eu.kanade.tachiyomi.data.sync.SyncDataJob
 import eu.kanade.tachiyomi.ui.browse.source.globalsearch.GlobalSearchScreen
 import eu.kanade.tachiyomi.ui.category.CategoryScreen
 import eu.kanade.tachiyomi.ui.home.HomeScreen
+import eu.kanade.tachiyomi.ui.library.LibraryScreenModel
+import eu.kanade.tachiyomi.ui.library.LibrarySettingsScreenModel
 import eu.kanade.tachiyomi.ui.main.MainActivity
 import eu.kanade.tachiyomi.ui.manga.MangaScreen
 import eu.kanade.tachiyomi.ui.reader.ReaderActivity
-import eu.kanade.tachiyomi.util.system.toast
-import eu.kanade.tachiyomi.util.system.workManager
-import exh.favorites.FavoritesSyncStatus
-import exh.recs.RecommendsScreen
 import exh.recs.batch.RecommendationSearchBottomSheetDialog
 import exh.recs.batch.RecommendationSearchProgressDialog
 import exh.recs.batch.SearchStatus
 import exh.source.MERGED_SOURCE_ID
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
@@ -79,26 +70,38 @@ import tachiyomi.i18n.sy.SYMR
 import tachiyomi.presentation.core.components.material.Scaffold
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.screens.EmptyScreen
-import tachiyomi.presentation.core.screens.EmptyScreenAction
 import tachiyomi.presentation.core.screens.LoadingScreen
 import tachiyomi.source.local.isLocal
+import uy.kohesive.injekt.Injekt
+import uy.kohesive.injekt.api.get
 
-data object LibraryTab : Tab {
+data object FollowingTab : Tab {
+
+    private val queryEvent = Channel<String>()
+    private val requestSettingsSheetEvent = Channel<Unit>()
 
     override val options: TabOptions
         @Composable
         get() {
             val isSelected = LocalTabNavigator.current.current.key == key
-            val image = AnimatedImageVector.animatedVectorResource(R.drawable.anim_library_enter)
+            val image = AnimatedImageVector.animatedVectorResource(R.drawable.anim_updates_enter)
             return TabOptions(
-                index = 0u,
-                title = stringResource(MR.strings.label_library),
+                index = 5u,
+                title = "Following",
                 icon = rememberAnimatedVectorPainter(image, isSelected),
             )
         }
 
     override suspend fun onReselect(navigator: Navigator) {
-        requestOpenSettingsSheet()
+        requestSettingsSheetEvent.send(Unit)
+    }
+
+    @Composable
+    override fun isEnabled(): Boolean {
+        val scope = rememberCoroutineScope()
+        return remember {
+            Injekt.get<UiPreferences>().showNavFollowing().asState(scope)
+        }.value
     }
 
     @Composable
@@ -108,37 +111,15 @@ data object LibraryTab : Tab {
         val scope = rememberCoroutineScope()
         val haptic = LocalHapticFeedback.current
 
-        val screenModel = rememberScreenModel { LibraryScreenModel() }
-        val settingsScreenModel = rememberScreenModel { LibrarySettingsScreenModel() }
-        val state by screenModel.state.collectAsState()
+        val screenModel = rememberScreenModel(tag = "following") {
+            LibraryScreenModel(tagFilter = "Following")
+        }
+        val settingsScreenModel = rememberScreenModel(tag = "following_settings") {
+            LibrarySettingsScreenModel()
+        }
+        val state: LibraryScreenModel.State by screenModel.state.collectAsState()
 
         val snackbarHostState = remember { SnackbarHostState() }
-
-        // Observe WorkManager state for sync job directly
-        val workInfos by context.workManager
-            .getWorkInfosByTagLiveData(SyncDataJob.TAG_MANUAL)
-            .observeAsState()
-
-        val isSyncing = workInfos?.any { it.state == WorkInfo.State.RUNNING } == true
-
-        val syncJustFinished = remember { mutableStateOf(false) }
-        val syncFailed = remember { mutableStateOf(false) }
-        val wasSyncing = remember { mutableStateOf(false) }
-
-        LaunchedEffect(isSyncing) {
-            if (wasSyncing.value && !isSyncing) {
-                // Read result from the completed work
-                val lastWork = workInfos?.lastOrNull {
-                    it.state == WorkInfo.State.SUCCEEDED &&
-                        it.outputData.keyValueMap.containsKey(SyncDataJob.KEY_SYNC_FAILED)
-                }
-                syncFailed.value = lastWork?.outputData?.getBoolean(SyncDataJob.KEY_SYNC_FAILED, false) ?: false
-                syncJustFinished.value = true
-                delay(1500L)
-                syncJustFinished.value = false
-            }
-            wasSyncing.value = isSyncing
-        }
 
         val onClickRefresh: (Category?) -> Boolean = { category ->
             val started = LibraryUpdateJob.startNow(
@@ -166,7 +147,7 @@ data object LibraryTab : Tab {
         Scaffold(
             topBar = { scrollBehavior ->
                 val title = state.getToolbarTitle(
-                    defaultTitle = stringResource(MR.strings.label_library),
+                    defaultTitle = "Following",
                     defaultCategoryTitle = stringResource(MR.strings.label_default),
                     page = state.coercedActiveCategoryIndex,
                 )
@@ -192,18 +173,12 @@ data object LibraryTab : Tab {
                             }
                         }
                     },
-                    onClickSyncNow = {
-                        if (!SyncDataJob.isRunning(context)) {
-                            SyncDataJob.startNow(context, manual = true)
-                        } else {
-                            context.toast(SYMR.strings.sync_in_progress)
-                        }
-                    },
-                    onClickSyncExh = screenModel::openFavoritesSyncDialog.takeIf { state.showSyncExh },
-                    isSyncEnabled = state.isSyncEnabled,
-                    isSyncing = isSyncing,
-                    syncJustFinished = syncJustFinished.value,
-                    syncFailed = syncFailed.value,
+                    onClickSyncNow = {},
+                    onClickSyncExh = null,
+                    isSyncEnabled = false,
+                    isSyncing = false,
+                    syncJustFinished = false,
+                    syncFailed = false,
                     searchQuery = state.searchQuery,
                     onSearchQueryChange = screenModel::search,
                     scrollBehavior = scrollBehavior.takeIf { !state.showCategoryTabs },
@@ -231,7 +206,7 @@ data object LibraryTab : Tab {
                     },
                     onClickCleanTitles = screenModel::cleanTitles.takeIf { state.showCleanTitles },
                     onClickCollectRecommendations = screenModel::showRecommendationSearchDialog.takeIf { state.selection.size > 1 },
-                    onClickAddToMangaDex = screenModel::syncMangaToDex.takeIf { state.showAddToMangadex },
+                    onClickAddToMangaDex = null,
                     onClickResetInfo = screenModel::resetInfo.takeIf { state.showResetInfo },
                     onClickManageTags = screenModel::showBulkManageTagsDialog,
                 )
@@ -244,17 +219,10 @@ data object LibraryTab : Tab {
                 }
 
                 state.searchQuery.isNullOrEmpty() && !state.hasActiveFilters && state.isLibraryEmpty -> {
-                    val handler = LocalUriHandler.current
                     EmptyScreen(
                         stringRes = MR.strings.information_empty_library,
                         modifier = Modifier.padding(contentPadding),
-                        actions = persistentListOf(
-                            EmptyScreenAction(
-                                stringRes = MR.strings.getting_started_guide,
-                                icon = Icons.AutoMirrored.Outlined.HelpOutline,
-                                onClick = { handler.openUri(GETTING_STARTED_URL) },
-                            ),
-                        ),
+                        actions = persistentListOf(),
                     )
                 }
 
@@ -287,9 +255,7 @@ data object LibraryTab : Tab {
                             screenModel.toggleRangeSelection(category, manga)
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         },
-                        onRefresh = {
-                            onClickRefresh(state.activeCategory)
-                        },
+                        onRefresh = { onClickRefresh(state.activeCategory) },
                         onGlobalSearchClicked = {
                             navigator.push(GlobalSearchScreen(screenModel.state.value.searchQuery ?: ""))
                         },
@@ -304,15 +270,14 @@ data object LibraryTab : Tab {
 
         val onDismissRequest = screenModel::closeDialog
         when (val dialog = state.dialog) {
-            is LibraryScreenModel.Dialog.SettingsSheet -> run {
+            is LibraryScreenModel.Dialog.SettingsSheet -> {
                 LibrarySettingsDialog(
                     onDismissRequest = onDismissRequest,
                     screenModel = settingsScreenModel,
                     category = state.activeCategory,
-                    hasCategories = state.libraryData.categories.fastAny { !it.isSystemCategory },
+                    hasCategories = false,
                 )
             }
-
             is LibraryScreenModel.Dialog.ChangeCategory -> {
                 ChangeCategoryDialog(
                     initialSelection = dialog.initialSelection,
@@ -323,11 +288,14 @@ data object LibraryTab : Tab {
                     },
                     onConfirm = { include, exclude ->
                         screenModel.clearSelection()
-                        screenModel.setMangaCategories(dialog.manga, include, exclude)
+                        screenModel.setMangaCategories(
+                            mangaList = dialog.manga,
+                            addCategories = include,
+                            removeCategories = exclude,
+                        )
                     },
                 )
             }
-
             is LibraryScreenModel.Dialog.DeleteManga -> {
                 DeleteLibraryMangaDialog(
                     containsLocalManga = dialog.manga.any(Manga::isLocal),
@@ -338,27 +306,6 @@ data object LibraryTab : Tab {
                     },
                 )
             }
-
-            LibraryScreenModel.Dialog.SyncFavoritesWarning -> {
-                SyncFavoritesWarningDialog(
-                    onDismissRequest = onDismissRequest,
-                    onAccept = {
-                        onDismissRequest()
-                        screenModel.onAcceptSyncWarning()
-                    },
-                )
-            }
-
-            LibraryScreenModel.Dialog.SyncFavoritesConfirm -> {
-                SyncFavoritesConfirmDialog(
-                    onDismissRequest = onDismissRequest,
-                    onAccept = {
-                        onDismissRequest()
-                        screenModel.runSync()
-                    },
-                )
-            }
-
             is LibraryScreenModel.Dialog.ManageTags -> {
                 ManageTagsDialog(
                     allTags = dialog.allTags,
@@ -382,15 +329,8 @@ data object LibraryTab : Tab {
                     },
                 )
             }
-
-            null -> {}
+            else -> {}
         }
-
-        SyncFavoritesProgressDialog(
-            status = screenModel.favoritesSync.status.collectAsState().value,
-            setStatusIdle = { screenModel.favoritesSync.status.value = FavoritesSyncStatus.Idle },
-            openManga = { navigator.push(MangaScreen(it)) },
-        )
 
         RecommendationSearchProgressDialog(
             status = screenModel.recommendationSearch.status.collectAsState().value,
@@ -442,9 +382,5 @@ data object LibraryTab : Tab {
         }
     }
 
-    private val queryEvent = Channel<String>()
     suspend fun search(query: String) = queryEvent.send(query)
-
-    private val requestSettingsSheetEvent = Channel<Unit>()
-    private suspend fun requestOpenSettingsSheet() = requestSettingsSheetEvent.send(Unit)
 }

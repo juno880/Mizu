@@ -114,6 +114,9 @@ import tachiyomi.domain.manga.interactor.DeleteMergeById
 import tachiyomi.domain.manga.interactor.GetDuplicateLibraryManga
 import tachiyomi.domain.manga.interactor.GetFlatMetadataById
 import tachiyomi.domain.manga.interactor.GetManga
+import tachiyomi.domain.manga.interactor.GetTags
+import tachiyomi.domain.manga.interactor.SetTagsForManga
+import tachiyomi.domain.manga.model.Tag
 import tachiyomi.domain.manga.interactor.GetMangaWithChapters
 import tachiyomi.domain.manga.interactor.GetMergedMangaById
 import tachiyomi.domain.manga.interactor.GetMergedReferencesById
@@ -190,6 +193,8 @@ class MangaScreenModel(
     private val addTracks: AddTracks = Injekt.get(),
     private val setMangaCategories: SetMangaCategories = Injekt.get(),
     private val mangaRepository: MangaRepository = Injekt.get(),
+    private val getTags: GetTags = Injekt.get(),
+    private val setTagsForManga: SetTagsForManga = Injekt.get(),
     private val filterChaptersForDownload: FilterChaptersForDownload = Injekt.get(),
     val snackbarHostState: SnackbarHostState = SnackbarHostState(),
 ) : StateScreenModel<MangaScreenModel.State>(State.Loading) {
@@ -444,6 +449,8 @@ class MangaScreenModel(
                     alwaysShowReadingProgress =
                     readerPreferences.preserveReadingPosition().get() && manga.isEhBasedManga(),
                     previewsRowCount = uiPreferences.previewsRowCount().get(),
+                    allTags = getTags.await().toImmutableList(),
+                    tags = getTags.awaitForManga(mangaId).toImmutableList(),
                     // SY <--
                 )
             }
@@ -462,6 +469,27 @@ class MangaScreenModel(
 
             // Initial loading finished
             updateSuccessState { it.copy(isRefreshingData = false) }
+        }
+
+        screenModelScope.launchIO {
+            getTags.subscribeForManga(mangaId)
+                .flowWithLifecycle(lifecycle)
+                .distinctUntilChanged()
+                .collectLatest { tags ->
+                    updateSuccessState {
+                        it.copy(tags = tags.toImmutableList())
+                    }
+                }
+        }
+        screenModelScope.launchIO {
+            getTags.subscribe()
+                .flowWithLifecycle(lifecycle)
+                .distinctUntilChanged()
+                .collectLatest { tags ->
+                    updateSuccessState {
+                        it.copy(allTags = tags.toImmutableList())
+                    }
+                }
         }
     }
 
@@ -1668,6 +1696,7 @@ class MangaScreenModel(
         data class EditMergedSettings(val mergedData: MergedMangaData) : Dialog
         // SY <--
 
+        data class ManageTags(val manga: Manga, val allTags: ImmutableList<Tag>, val mangaTags: ImmutableList<Tag>) : Dialog
         data object SettingsSheet : Dialog
         data object TrackSheet : Dialog
         data object FullCover : Dialog
@@ -1691,6 +1720,38 @@ class MangaScreenModel(
 
     fun showCoverDialog() {
         updateSuccessState { it.copy(dialog = Dialog.FullCover) }
+    }
+
+    fun showManageTagsDialog() {
+        val state = successState ?: return
+        updateSuccessState {
+            it.copy(dialog = Dialog.ManageTags(state.manga, state.allTags, state.tags))
+        }
+    }
+
+    fun setMangaTags(tagIds: List<Long>) {
+        screenModelScope.launchIO {
+            setTagsForManga.await(mangaId, tagIds)
+        }
+    }
+
+    fun createAndAddTag(name: String) {
+        screenModelScope.launchIO {
+            val repo: tachiyomi.domain.manga.repository.TagRepository = Injekt.get()
+            val tagId = repo.insertTag(name)
+            if (tagId > 0) {
+                val current = successState?.tags?.map { it.id }?.toMutableList() ?: mutableListOf()
+                current.add(tagId)
+                setTagsForManga.await(mangaId, current)
+            }
+        }
+    }
+
+    fun deleteTag(tagId: Long) {
+        screenModelScope.launchIO {
+            val repo: tachiyomi.domain.manga.repository.TagRepository = Injekt.get()
+            repo.deleteTag(tagId)
+        }
     }
 
     fun showMigrateDialog(duplicate: Manga) {
@@ -1754,6 +1815,8 @@ class MangaScreenModel(
             val showMergeWithAnother: Boolean,
             val pagePreviewsState: PagePreviewState,
             val alwaysShowReadingProgress: Boolean,
+            val tags: ImmutableList<Tag> = kotlinx.collections.immutable.persistentListOf(),
+            val allTags: ImmutableList<Tag> = kotlinx.collections.immutable.persistentListOf(),
             val previewsRowCount: Int,
             // SY <--
         ) : State {

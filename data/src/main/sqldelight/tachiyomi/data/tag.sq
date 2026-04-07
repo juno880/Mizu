@@ -1,0 +1,57 @@
+CREATE TABLE tags (
+    _id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE manga_tags (
+    manga_id INTEGER NOT NULL,
+    tag_id INTEGER NOT NULL,
+    PRIMARY KEY (manga_id, tag_id),
+    FOREIGN KEY (manga_id) REFERENCES mangas(_id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES tags(_id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_manga_tags_manga_id ON manga_tags(manga_id);
+CREATE INDEX idx_manga_tags_tag_id ON manga_tags(tag_id);
+
+insertTag:
+INSERT OR IGNORE INTO tags(name) VALUES (:name);
+
+deleteTag:
+DELETE FROM tags WHERE _id = :id;
+
+renameTag:
+UPDATE tags SET name = :name WHERE _id = :id;
+
+getAllTags:
+SELECT * FROM tags;
+
+getTagById:
+SELECT * FROM tags WHERE _id = :id;
+
+addMangaTag:
+INSERT OR IGNORE INTO manga_tags(manga_id, tag_id) VALUES (:mangaId, :tagId);
+
+removeMangaTag:
+DELETE FROM manga_tags WHERE manga_id = :mangaId AND tag_id = :tagId;
+
+removeAllTagsFromManga:
+DELETE FROM manga_tags WHERE manga_id = :mangaId;
+
+getTagsForManga:
+SELECT tags.*
+FROM tags
+JOIN manga_tags ON tags._id = manga_tags.tag_id
+WHERE manga_tags.manga_id = :mangaId;
+
+getMangaIdsForTag:
+SELECT manga_id FROM manga_tags WHERE tag_id = :tagId;
+
+getTagsForMangaIds:
+SELECT manga_tags.manga_id, tags.*
+FROM tags
+JOIN manga_tags ON tags._id = manga_tags.tag_id
+WHERE manga_tags.manga_id IN :mangaIds;
+
+selectLastInsertedRowId:
+SELECT last_insert_rowid();

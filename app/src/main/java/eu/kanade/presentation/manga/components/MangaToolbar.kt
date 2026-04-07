@@ -39,6 +39,7 @@ fun MangaToolbar(
     onClickRefresh: () -> Unit,
     onClickMigrate: (() -> Unit)?,
     onClickEditNotes: () -> Unit,
+    onClickManageTags: () -> Unit,
     // SY -->
     onClickEditInfo: (() -> Unit)?,
     onClickRecommend: (() -> Unit)?,
@@ -152,6 +153,12 @@ fun MangaToolbar(
                         AppBar.OverflowAction(
                             title = stringResource(MR.strings.action_notes),
                             onClick = onClickEditNotes,
+                        ),
+                    )
+                    add(
+                        AppBar.OverflowAction(
+                            title = "Manage Tags",
+                            onClick = onClickManageTags,
                         ),
                     )
                     // SY -->

@@ -244,6 +244,7 @@ fun LibraryBottomActionMenu(
     onClickCollectRecommendations: (() -> Unit)?,
     onClickAddToMangaDex: (() -> Unit)?,
     onClickResetInfo: (() -> Unit)?,
+    onClickManageTags: (() -> Unit)?,
     // SY <--
     modifier: Modifier = Modifier,
 ) {
@@ -275,7 +276,8 @@ fun LibraryBottomActionMenu(
                 onClickAddToMangaDex != null ||
                 onClickResetInfo != null ||
                 onClickCollectRecommendations != null ||
-                onMigrateClicked != null
+                onMigrateClicked != null ||
+                onClickManageTags != null
             val configuration = LocalConfiguration.current
             val moveMarkPrev = remember { !configuration.isTabletUi() }
             var overFlowOpen by remember { mutableStateOf(false) }
@@ -382,6 +384,12 @@ fun LibraryBottomActionMenu(
                             DropdownMenuItem(
                                 text = { Text(text = stringResource(SYMR.strings.reset_info)) },
                                 onClick = onClickResetInfo,
+                            )
+                        }
+                        if (onClickManageTags != null) {
+                            DropdownMenuItem(
+                                text = { Text("Manage Tags") },
+                                onClick = onClickManageTags,
                             )
                         }
                     }

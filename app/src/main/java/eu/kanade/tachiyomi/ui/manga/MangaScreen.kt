@@ -1,6 +1,7 @@
 package eu.kanade.tachiyomi.ui.manga
 
 import android.content.Context
+import eu.kanade.presentation.manga.components.ManageTagsDialog
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -211,6 +212,7 @@ class MangaScreen(
                 successState.manga.favorite /* SY --> */ && successState.manga.source != MERGED_SOURCE_ID /* SY <-- */
             },
             onEditNotesClicked = { navigator.push(MangaNotesScreen(manga = successState.manga)) },
+            onManageTagsClicked = screenModel::showManageTagsDialog,
             // SY -->
             onMetadataViewerClicked = { openMetadataViewer(navigator, successState.manga) },
             onEditInfoClicked = screenModel::showEditMangaInfoDialog,
@@ -338,6 +340,23 @@ class MangaScreen(
                     onDismissRequest = onDismissRequest,
                     onValueChanged = { interval: Int -> screenModel.setFetchInterval(dialog.manga, interval) }
                         .takeIf { screenModel.isUpdateIntervalEnabled },
+                )
+            }
+            is MangaScreenModel.Dialog.ManageTags -> {
+                ManageTagsDialog(
+                    allTags = successState.allTags,
+                    mangaTags = successState.tags,
+                    onDismiss = onDismissRequest,
+                    onConfirm = { tagIds ->
+                        screenModel.setMangaTags(tagIds)
+                        screenModel.dismissDialog()
+                    },
+                    onCreateTag = { name ->
+                        screenModel.createAndAddTag(name)
+                    },
+                    onDeleteTag = { tagId ->
+                        screenModel.deleteTag(tagId)
+                    },
                 )
             }
             // SY -->

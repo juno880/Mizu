@@ -100,6 +100,8 @@ import tachiyomi.domain.manga.interactor.GetLibraryManga
 import tachiyomi.domain.manga.interactor.GetMergedMangaById
 import tachiyomi.domain.manga.interactor.GetSearchTags
 import tachiyomi.domain.manga.interactor.GetSearchTitles
+import tachiyomi.domain.manga.interactor.GetTags
+import tachiyomi.domain.manga.interactor.SetTagsForManga
 import tachiyomi.domain.manga.interactor.SetCustomMangaInfo
 import tachiyomi.domain.manga.model.CustomMangaInfo
 import tachiyomi.domain.manga.model.Manga
@@ -118,6 +120,7 @@ import uy.kohesive.injekt.api.get
 import kotlin.random.Random
 
 class LibraryScreenModel(
+    val tagFilter: String? = null,
     private val getLibraryManga: GetLibraryManga = Injekt.get(),
     private val getCategories: GetCategories = Injekt.get(),
     private val getTracksPerManga: GetTracksPerManga = Injekt.get(),
@@ -142,6 +145,8 @@ class LibraryScreenModel(
     private val getIdsOfFavoriteMangaWithMetadata: GetIdsOfFavoriteMangaWithMetadata = Injekt.get(),
     private val getSearchTags: GetSearchTags = Injekt.get(),
     private val getSearchTitles: GetSearchTitles = Injekt.get(),
+    private val getTags: GetTags = Injekt.get(),
+    private val setTagsForManga: SetTagsForManga = Injekt.get(),
     private val searchEngine: SearchEngine = Injekt.get(),
     private val setCustomMangaInfo: SetCustomMangaInfo = Injekt.get(),
     private val getMergedChaptersByMangaId: GetMergedChaptersByMangaId = Injekt.get(),
@@ -185,6 +190,16 @@ class LibraryScreenModel(
             ) { (searchQuery, categories, favorites), (tracksMap, trackingFilters), /* SY --> */ (groupType, sortingMode)/* <-- SY */, itemPreferences ->
                 val showSystemCategory = favorites.any { it.libraryManga.categories.contains(0) }
                 val filteredFavorites = favorites
+                    .let { items ->
+                        if (tagFilter != null) {
+                            items.filter { item ->
+                                runBlocking {
+                                    getTags.awaitForManga(item.libraryManga.manga.id)
+                                        .any { it.name.equals(tagFilter, ignoreCase = true) }
+                                }
+                            }
+                        } else items
+                    }
                     .applyFilters(tracksMap, trackingFilters, itemPreferences)
                     .let {
                         if (searchQuery == null) {
@@ -642,40 +657,54 @@ class LibraryScreenModel(
             getLibraryManga.subscribe(),
             getLibraryItemPreferencesFlow(),
             downloadCache.changes,
-        ) { libraryManga, preferences, _ ->
-            libraryManga.map { manga ->
-                LibraryItem(
-                    libraryManga = manga,
-                    downloadCount = if (preferences.downloadBadge) {
-                        // SY -->
-                        if (manga.manga.source == MERGED_SOURCE_ID) {
+            getTags.subscribe(),
+        ) { libraryManga, preferences, _, _ ->
+            libraryManga
+                .let { items ->
+                    if (tagFilter != null) {
+                        items.filter { item ->
                             runBlocking {
-                                getMergedMangaById.await(manga.manga.id)
-                            }.sumOf { downloadManager.getDownloadCount(it) }.toLong()
-                        } else {
-                            downloadManager.getDownloadCount(manga.manga).toLong()
+                                getTags.awaitForManga(item.manga.id)
+                                    .any { it.name.equals(tagFilter, ignoreCase = true) }
+                            }
                         }
-                        // SY <--
                     } else {
-                        0
-                    },
-                    unreadCount = if (preferences.unreadBadge) {
-                        manga.unreadCount
-                    } else {
-                        0
-                    },
-                    isLocal = if (preferences.localBadge) {
-                        manga.manga.isLocal()
-                    } else {
-                        false
-                    },
-                    sourceLanguage = if (preferences.languageBadge) {
-                        sourceManager.getOrStub(manga.manga.source).lang
-                    } else {
-                        ""
-                    },
-                )
-            }
+                        items
+                    }
+                }
+                .map { manga ->
+                    LibraryItem(
+                        libraryManga = manga,
+                        downloadCount = if (preferences.downloadBadge) {
+                            // SY -->
+                            if (manga.manga.source == MERGED_SOURCE_ID) {
+                                runBlocking {
+                                    getMergedMangaById.await(manga.manga.id)
+                                }.sumOf { downloadManager.getDownloadCount(it) }.toLong()
+                            } else {
+                                downloadManager.getDownloadCount(manga.manga).toLong()
+                            }
+                            // SY <--
+                        } else {
+                            0
+                        },
+                        unreadCount = if (preferences.unreadBadge) {
+                            manga.unreadCount
+                        } else {
+                            0
+                        },
+                        isLocal = if (preferences.localBadge) {
+                            manga.manga.isLocal()
+                        } else {
+                            false
+                        },
+                        sourceLanguage = if (preferences.languageBadge) {
+                            sourceManager.getOrStub(manga.manga.source).lang
+                        } else {
+                            ""
+                        },
+                    )
+                }
         }
     }
 
@@ -1033,6 +1062,7 @@ class LibraryScreenModel(
                 .associateBy { it.id }
             unfiltered.asFlow().cancellable().filter { item ->
                 val mangaId = item.libraryManga.manga.id
+                val customTags = getTags.awaitForManga(mangaId)
                 if (query.startsWith("id:", true)) {
                     val id = query.substringAfter("id:").toLongOrNull()
                     return@filter mangaId == id
@@ -1047,6 +1077,7 @@ class LibraryScreenModel(
                             tracks = tracks[mangaId],
                             source = sources[sourceId],
                             loggedInTrackServices = loggedInTrackServices,
+                            customTags = customTags,
                         )
                     } else {
                         val tags = getSearchTags.await(mangaId)
@@ -1060,6 +1091,7 @@ class LibraryScreenModel(
                             searchTags = tags,
                             searchTitles = titles,
                             loggedInTrackServices = loggedInTrackServices,
+                            customTags = customTags,
                         )
                     }
                 } else {
@@ -1069,6 +1101,7 @@ class LibraryScreenModel(
                         tracks = tracks[mangaId],
                         source = sources[sourceId],
                         loggedInTrackServices = loggedInTrackServices,
+                        customTags = customTags,
                     )
                 }
             }.toList()
@@ -1086,6 +1119,7 @@ class LibraryScreenModel(
         searchTags: List<SearchTag>? = null,
         searchTitles: List<SearchTitle>? = null,
         loggedInTrackServices: Map<Long, TriState>,
+        customTags: List<tachiyomi.domain.manga.model.Tag> = emptyList(),
     ): Boolean {
         val manga = libraryManga.manga
         val sourceIdString = manga.source.takeUnless { it == LocalSource.ID }?.toString()
@@ -1109,7 +1143,8 @@ class LibraryScreenModel(
                                 ) ||
                             (genre.fastAny { it.contains(query, true) }) ||
                             (searchTags?.fastAny { it.name.contains(query, true) } == true) ||
-                            (searchTitles?.fastAny { it.title.contains(query, true) } == true)
+                            (searchTitles?.fastAny { it.title.contains(query, true) } == true) ||
+                            (customTags.fastAny { it.name.contains(query, true) })
                     }
 
                     is Namespace -> {
@@ -1307,6 +1342,39 @@ class LibraryScreenModel(
     fun closeDialog() {
         mutableState.update { it.copy(dialog = null) }
     }
+    fun showBulkManageTagsDialog() {
+        screenModelScope.launchIO {
+            val allTags = getTags.await().toImmutableList()
+            mutableState.update { it.copy(dialog = Dialog.ManageTags(allTags)) }
+        }
+    }
+
+    fun bulkSetTags(tagIds: List<Long>) {
+        val mangaList = state.value.selectedManga
+        screenModelScope.launchNonCancellable {
+            mangaList.forEach { manga ->
+                setTagsForManga.await(manga.id, tagIds)
+            }
+        }
+        clearSelection()
+    }
+
+    fun createAndAddTag(name: String) {
+        screenModelScope.launchIO {
+            getTags.await().find { it.name.equals(name, ignoreCase = true) }
+                ?: run {
+                    val repo: tachiyomi.domain.manga.repository.TagRepository = Injekt.get()
+                    repo.insertTag(name)
+                }
+        }
+    }
+
+    fun deleteTag(tagId: Long) {
+        screenModelScope.launchIO {
+            val repo: tachiyomi.domain.manga.repository.TagRepository = Injekt.get()
+            repo.deleteTag(tagId)
+        }
+    }
 
     sealed interface Dialog {
         data object SettingsSheet : Dialog
@@ -1321,6 +1389,7 @@ class LibraryScreenModel(
         data object SyncFavoritesWarning : Dialog
         data object SyncFavoritesConfirm : Dialog
         data class RecommendationSearchSheet(val manga: List<Manga>) : Dialog
+        data class ManageTags(val allTags: kotlinx.collections.immutable.ImmutableList<tachiyomi.domain.manga.model.Tag>) : Dialog
         // SY <--
     }
 

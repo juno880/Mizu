@@ -41,6 +41,7 @@ fun MoreScreen(
     // SY -->
     showNavUpdates: Boolean,
     showNavHistory: Boolean,
+    showNavFollowing: Boolean,
     // SY <--
     onClickDownloadQueue: () -> Unit,
     onClickCategories: () -> Unit,
@@ -51,6 +52,7 @@ fun MoreScreen(
     onClickBatchAdd: () -> Unit,
     onClickUpdates: () -> Unit,
     onClickHistory: () -> Unit,
+    onClickFollowing: () -> Unit,
 ) {
     val uriHandler = LocalUriHandler.current
 
@@ -98,6 +100,15 @@ fun MoreScreen(
                         title = stringResource(MR.strings.label_recent_manga),
                         icon = Icons.Outlined.History,
                         onPreferenceClick = onClickHistory,
+                    )
+                }
+            }
+            if (!showNavFollowing) {
+                item {
+                    TextPreferenceWidget(
+                        title = "Following",
+                        icon = Icons.Outlined.NewReleases,
+                        onPreferenceClick = onClickFollowing,
                     )
                 }
             }

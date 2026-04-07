@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import eu.kanade.tachiyomi.ui.following.FollowingTab
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.RowScope
@@ -77,6 +78,7 @@ object HomeScreen : Screen() {
 
     private val TABS = listOf(
         LibraryTab,
+        FollowingTab,
         UpdatesTab,
         HistoryTab,
         BrowseTab,
@@ -182,8 +184,8 @@ object HomeScreen : Screen() {
                                 }
                                 BrowseTab
                             }
-
                             is Tab.More -> MoreTab
+                            Tab.Following -> FollowingTab
                         }
 
                         if (it is Tab.Library && it.mangaIdToOpen != null) {
@@ -285,6 +287,32 @@ object HomeScreen : Screen() {
                             }
                         }
                     }
+                    tab is FollowingTab -> {
+                        val count by produceState(initialValue = 0) {
+                            val getLibraryManga = Injekt.get<tachiyomi.domain.manga.interactor.GetLibraryManga>()
+                            val getTags = Injekt.get<tachiyomi.domain.manga.interactor.GetTags>()
+                            combine(
+                                getLibraryManga.subscribe(),
+                                getTags.subscribe(),
+                            ) { libraryManga, _ ->
+                                libraryManga.count { item ->
+                                    item.unreadCount > 0 &&
+                                        kotlinx.coroutines.runBlocking {
+                                            getTags.awaitForManga(item.manga.id)
+                                                .any { it.name.equals("Following", ignoreCase = true) }
+                                        }
+                                }
+                            }.collectLatest { value = it }
+                        }
+                        if (count > 0) {
+                            Badge(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ) {
+                                Text(text = count.toString())
+                            }
+                        }
+                    }
 
                     BrowseTab::class.isInstance(tab) -> {
                         val count by produceState(initialValue = 0) {
@@ -333,5 +361,6 @@ object HomeScreen : Screen() {
         data object History : Tab
         data class Browse(val toExtensions: Boolean = false) : Tab
         data class More(val toDownloads: Boolean) : Tab
+        data object Following : Tab
     }
 }

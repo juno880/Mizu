@@ -1,5 +1,10 @@
 package eu.kanade.presentation.manga
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material3.SuggestionChip
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Box
@@ -109,6 +114,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun MangaScreen(
     state: MangaScreenModel.State.Success,
@@ -143,6 +149,7 @@ fun MangaScreen(
     onEditFetchIntervalClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     onEditNotesClicked: () -> Unit,
+    onManageTagsClicked: () -> Unit,
     // SY -->
     onMetadataViewerClicked: () -> Unit,
     onEditInfoClicked: () -> Unit,
@@ -203,6 +210,7 @@ fun MangaScreen(
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
             onEditNotesClicked = onEditNotesClicked,
+            onManageTagsClicked = onManageTagsClicked,
             // SY -->
             onMetadataViewerClicked = onMetadataViewerClicked,
             onEditInfoClicked = onEditInfoClicked,
@@ -250,6 +258,8 @@ fun MangaScreen(
             onEditIntervalClicked = onEditFetchIntervalClicked,
             onMigrateClicked = onMigrateClicked,
             onEditNotesClicked = onEditNotesClicked,
+            onManageTagsClicked = onManageTagsClicked,
+// SY -->
             // SY -->
             onMetadataViewerClicked = onMetadataViewerClicked,
             onEditInfoClicked = onEditInfoClicked,
@@ -307,6 +317,7 @@ private fun MangaScreenSmallImpl(
     onEditIntervalClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     onEditNotesClicked: () -> Unit,
+    onManageTagsClicked: () -> Unit,
     // SY -->
     onMetadataViewerClicked: () -> Unit,
     onEditInfoClicked: () -> Unit,
@@ -383,6 +394,7 @@ private fun MangaScreenSmallImpl(
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onClickEditNotes = onEditNotesClicked,
+                onClickManageTags = onManageTagsClicked,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.manga.favorite },
                 onClickRecommend = onRecommendClicked.takeIf { state.showRecommendationsInOverflow },
@@ -509,7 +521,24 @@ private fun MangaScreenSmallImpl(
                         }
                     }
                     // SY <--
-
+                    if (state.tags.isNotEmpty()) {
+                        item(
+                            key = "user_tags",
+                            contentType = "user_tags",
+                        ) {
+                            FlowRow(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                state.tags.forEach { tag ->
+                                    SuggestionChip(
+                                        onClick = { onSearch(tag.name, false) },
+                                        label = { Text(tag.name) },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     item(
                         key = MangaScreenItem.DESCRIPTION_WITH_TAG,
                         contentType = MangaScreenItem.DESCRIPTION_WITH_TAG,
@@ -628,6 +657,7 @@ fun MangaScreenLargeImpl(
     onEditIntervalClicked: (() -> Unit)?,
     onMigrateClicked: (() -> Unit)?,
     onEditNotesClicked: () -> Unit,
+    onManageTagsClicked: () -> Unit,
     // SY -->
     onMetadataViewerClicked: () -> Unit,
     onEditInfoClicked: () -> Unit,
@@ -695,6 +725,7 @@ fun MangaScreenLargeImpl(
                 onClickRefresh = onRefresh,
                 onClickMigrate = onMigrateClicked,
                 onClickEditNotes = onEditNotesClicked,
+                onClickManageTags = onManageTagsClicked,
                 // SY -->
                 onClickEditInfo = onEditInfoClicked.takeIf { state.manga.favorite },
                 onClickRecommend = onRecommendClicked.takeIf { state.showRecommendationsInOverflow },
@@ -807,6 +838,19 @@ fun MangaScreenLargeImpl(
                             onSearch(it, false)
                         }
                         // SY <--
+                        if (state.tags.isNotEmpty()) {
+                            FlowRow(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                state.tags.forEach { tag ->
+                                    SuggestionChip(
+                                        onClick = { onSearch(tag.name, false) },
+                                        label = { Text(tag.name) },
+                                    )
+                                }
+                            }
+                        }
                         ExpandableMangaDescription(
                             defaultExpandState = true,
                             description = state.manga.description,

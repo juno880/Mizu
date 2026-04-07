@@ -4,6 +4,7 @@ import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.runtime.Composable
+import eu.kanade.tachiyomi.ui.following.FollowingTab
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -74,6 +75,7 @@ data object MoreTab : Tab {
             // SY -->
             showNavUpdates = screenModel.showNavUpdates,
             showNavHistory = screenModel.showNavHistory,
+            showNavFollowing = screenModel.showNavFollowing,
             // SY <--
             onClickDownloadQueue = { navigator.push(DownloadQueueScreen) },
             onClickCategories = { navigator.push(CategoryScreen()) },
@@ -85,7 +87,8 @@ data object MoreTab : Tab {
             onClickBatchAdd = { navigator.push(BatchAddScreen()) },
             onClickUpdates = { navigator.push(UpdatesTab) },
             onClickHistory = { navigator.push(HistoryTab) },
-            // SY <--
+            onClickFollowing = { navigator.push(FollowingTab) },
+            // SY <--ma
         )
     }
 }
@@ -104,6 +107,7 @@ private class MoreScreenModel(
     // SY -->
     val showNavUpdates by uiPreferences.showNavUpdates().asState(screenModelScope)
     val showNavHistory by uiPreferences.showNavHistory().asState(screenModelScope)
+    val showNavFollowing by uiPreferences.showNavFollowing().asState(screenModelScope)
     // SY <--
 
     private var _downloadQueueState: MutableStateFlow<DownloadQueueState> = MutableStateFlow(DownloadQueueState.Stopped)
