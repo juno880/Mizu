@@ -3,6 +3,8 @@ package eu.kanade.tachiyomi.ui.library
 import android.app.Application
 import android.content.Context
 import androidx.compose.runtime.Immutable
+import logcat.LogPriority
+import tachiyomi.core.common.util.system.logcat
 import androidx.compose.ui.util.fastAll
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastFilter
@@ -121,6 +123,7 @@ import kotlin.random.Random
 
 class LibraryScreenModel(
     val tagFilter: String? = null,
+    val forceGroupType: Int? = null,
     private val getLibraryManga: GetLibraryManga = Injekt.get(),
     private val getCategories: GetCategories = Injekt.get(),
     private val getTracksPerManga: GetTracksPerManga = Injekt.get(),
@@ -181,7 +184,7 @@ class LibraryScreenModel(
                 ),
                 // SY -->
                 combine(
-                    state.map { it.groupType }.distinctUntilChanged(),
+                    state.map { forceGroupType ?: it.groupType }.distinctUntilChanged(),
                     libraryPreferences.sortingMode().changes(),
                     ::Pair,
                 ),
@@ -236,7 +239,7 @@ class LibraryScreenModel(
                     Pair(
                         it.libraryData,
                         // SY -->
-                        it.groupType,
+                        forceGroupType ?: it.groupType,
                         // SY <--
                     )
                 }
@@ -1345,15 +1348,42 @@ class LibraryScreenModel(
     fun showBulkManageTagsDialog() {
         screenModelScope.launchIO {
             val allTags = getTags.await().toImmutableList()
-            mutableState.update { it.copy(dialog = Dialog.ManageTags(allTags)) }
+            val mangaList = state.value.selectedManga
+            val tagsPerManga = mangaList.map { manga ->
+                getTags.awaitForManga(manga.id).map { it.id }.toSet()
+            }
+            val selectedAll = allTags
+                .filter { tag -> tagsPerManga.all { tag.id in it } }
+                .map { it.id }
+                .toImmutableList()
+            val selectedSome = allTags
+                .filter { tag -> tagsPerManga.any { tag.id in it } && !selectedAll.contains(tag.id) }
+                .map { it.id }
+                .toImmutableList()
+            mutableState.update {
+                it.copy(dialog = Dialog.ManageTags(allTags, selectedAll, selectedSome))
+            }
         }
     }
 
-    fun bulkSetTags(tagIds: List<Long>) {
+    fun bulkSetTags(addTagIds: List<Long>, removeTagIds: List<Long>) {
         val mangaList = state.value.selectedManga
         screenModelScope.launchNonCancellable {
             mangaList.forEach { manga ->
-                setTagsForManga.await(manga.id, tagIds)
+                try {
+                    val currentTags = getTags.awaitForManga(manga.id).map { it.id }.toMutableList()
+                    currentTags.addAll(addTagIds.filter { it !in currentTags })
+                    currentTags.removeAll(removeTagIds.toSet())
+                    setTagsForManga.await(manga.id, currentTags)
+                    updateManga.await(
+                        tachiyomi.domain.manga.model.MangaUpdate(
+                            id = manga.id,
+                            version = manga.version + 1,
+                        )
+                    )
+                } catch (e: Exception) {
+                    logcat(LogPriority.ERROR, e) { "Failed to set tags for manga ${manga.id}" }
+                }
             }
         }
         clearSelection()
@@ -1389,7 +1419,11 @@ class LibraryScreenModel(
         data object SyncFavoritesWarning : Dialog
         data object SyncFavoritesConfirm : Dialog
         data class RecommendationSearchSheet(val manga: List<Manga>) : Dialog
-        data class ManageTags(val allTags: kotlinx.collections.immutable.ImmutableList<tachiyomi.domain.manga.model.Tag>) : Dialog
+        data class ManageTags(
+            val allTags: kotlinx.collections.immutable.ImmutableList<tachiyomi.domain.manga.model.Tag>,
+            val selectedAll: kotlinx.collections.immutable.ImmutableList<Long>,
+            val selectedSome: kotlinx.collections.immutable.ImmutableList<Long>,
+        ) : Dialog
         // SY <--
     }
 

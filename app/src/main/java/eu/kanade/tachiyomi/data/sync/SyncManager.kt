@@ -46,6 +46,7 @@ class SyncManager(
         ignoreUnknownKeys = true
     },
     private val getCategories: GetCategories = Injekt.get(),
+    private val getTags: tachiyomi.domain.manga.interactor.GetTags = Injekt.get(),
 ) {
     private val backupCreator: BackupCreator = BackupCreator(context, false)
     private val notifier: SyncNotifier = SyncNotifier(context)
@@ -229,10 +230,12 @@ class SyncManager(
     private suspend fun isMangaDifferent(localManga: Manga, remoteManga: BackupManga): Boolean {
         val localChapters = handler.await { chaptersQueries.getChaptersByMangaId(localManga.id, 0).executeAsList() }
         val localCategories = getCategories.await(localManga.id).map { it.order }
+        val localTags = getTags.awaitForManga(localManga.id).map { it.name }.toSet()
 
         if (areChaptersDifferent(localChapters, remoteManga.chapters)) return true
         if (localManga.version != remoteManga.version) return true
         if (localCategories.toSet() != remoteManga.categories.toSet()) return true
+        if (localTags != remoteManga.customTags.toSet()) return true
 
         return false
     }

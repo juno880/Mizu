@@ -17,6 +17,7 @@ import tachiyomi.domain.category.interactor.GetCategories
 import tachiyomi.domain.history.interactor.GetHistory
 import tachiyomi.domain.manga.interactor.GetCustomMangaInfo
 import tachiyomi.domain.manga.interactor.GetFlatMetadataById
+import tachiyomi.domain.manga.interactor.GetTags
 import tachiyomi.domain.manga.model.CustomMangaInfo
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.source.service.SourceManager
@@ -31,6 +32,7 @@ class MangaBackupCreator(
     private val sourceManager: SourceManager = Injekt.get(),
     private val getCustomMangaInfo: GetCustomMangaInfo = Injekt.get(),
     private val getFlatMetadataById: GetFlatMetadataById = Injekt.get(),
+    private val getTags: GetTags = Injekt.get(),
     // SY <--
 ) {
 
@@ -110,6 +112,8 @@ class MangaBackupCreator(
                 }
             }
         }
+
+        mangaObject.customTags = getTags.awaitForManga(manga.id).map { it.name }
 
         return mangaObject
     }

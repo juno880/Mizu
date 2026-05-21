@@ -1732,6 +1732,14 @@ class MangaScreenModel(
     fun setMangaTags(tagIds: List<Long>) {
         screenModelScope.launchIO {
             setTagsForManga.await(mangaId, tagIds)
+            // Bump version so sync detects the change
+            val manga = successState?.manga ?: return@launchIO
+            updateManga.await(
+                tachiyomi.domain.manga.model.MangaUpdate(
+                    id = mangaId,
+                    version = manga.version + 1,
+                )
+            )
         }
     }
 

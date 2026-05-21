@@ -364,12 +364,16 @@ data object LibraryTab : Tab {
                     allTags = dialog.allTags,
                     mangaTags = persistentListOf(),
                     onDismiss = onDismissRequest,
-                    onConfirm = { tagIds ->
-                        screenModel.bulkSetTags(tagIds)
-                        onDismissRequest()
-                    },
+                    onConfirm = {},
                     onCreateTag = { name -> screenModel.createAndAddTag(name) },
                     onDeleteTag = { tagId -> screenModel.deleteTag(tagId) },
+                    selectedAll = dialog.selectedAll,
+                    selectedSome = dialog.selectedSome,
+                    isBulk = true,
+                    onBulkConfirm = { addIds, removeIds ->
+                        screenModel.bulkSetTags(addIds, removeIds)
+                        onDismissRequest()
+                    },
                 )
             }
             is LibraryScreenModel.Dialog.RecommendationSearchSheet -> {

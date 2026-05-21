@@ -21,6 +21,9 @@ import tachiyomi.domain.manga.interactor.GetFlatMetadataById
 import tachiyomi.domain.manga.interactor.GetMangaByUrlAndSourceId
 import tachiyomi.domain.manga.interactor.InsertFlatMetadata
 import tachiyomi.domain.manga.interactor.SetCustomMangaInfo
+import tachiyomi.domain.manga.interactor.GetTags
+import tachiyomi.domain.manga.interactor.SetTagsForManga
+import tachiyomi.domain.manga.repository.TagRepository
 import tachiyomi.domain.manga.model.CustomMangaInfo
 import tachiyomi.domain.manga.model.Manga
 import tachiyomi.domain.track.interactor.GetTracks
@@ -47,6 +50,8 @@ class MangaRestorer(
     private val setCustomMangaInfo: SetCustomMangaInfo = Injekt.get(),
     private val insertFlatMetadata: InsertFlatMetadata = Injekt.get(),
     private val getFlatMetadataById: GetFlatMetadataById = Injekt.get(),
+    private val tagRepository: TagRepository = Injekt.get(),
+    private val setTagsForManga: SetTagsForManga = Injekt.get(),
     // SY <--
 ) {
     private var now = ZonedDateTime.now()
@@ -92,11 +97,12 @@ class MangaRestorer(
                 history = backupManga.history,
                 tracks = backupManga.tracking,
                 excludedScanlators = backupManga.excludedScanlators,
-                // SY -->
+// SY -->
                 mergedMangaReferences = backupManga.mergedMangaReferences,
                 flatMetadata = backupManga.flatMetadata,
                 customManga = backupManga.getCustomMangaInfo(),
                 // SY <--
+                customTags = backupManga.customTags,
             )
 
             if (isSync) {
@@ -314,6 +320,7 @@ class MangaRestorer(
         flatMetadata: BackupFlatMetadata?,
         customManga: CustomMangaInfo?,
         // SY <--
+        customTags: List<String> = emptyList(),
     ): Manga {
         restoreCategories(manga, categories, backupCategories)
         restoreChapters(manga, chapters)
@@ -325,6 +332,7 @@ class MangaRestorer(
         restoreMergedMangaReferencesForManga(manga.id, mergedMangaReferences)
         flatMetadata?.let { restoreFlatMetadata(manga.id, it) }
         restoreEditedInfo(customManga?.copy(id = manga.id))
+        restoreTags(manga.id, customTags)
         // SY <--
 
         return manga
@@ -518,6 +526,15 @@ class MangaRestorer(
         if (getFlatMetadataById.await(mangaId) == null) {
             insertFlatMetadata.await(backupFlatMetadata.getFlatMetadata(mangaId))
         }
+    }
+
+    private suspend fun restoreTags(mangaId: Long, tagNames: List<String>) {
+        if (tagNames.isEmpty()) return
+        val tagIds = tagNames.map { name ->
+            tagRepository.getAllTags().find { it.name.equals(name, ignoreCase = true) }?.id
+                ?: tagRepository.insertTag(name)
+        }
+        setTagsForManga.await(mangaId, tagIds)
     }
 
     private fun restoreEditedInfo(mangaJson: CustomMangaInfo?) {

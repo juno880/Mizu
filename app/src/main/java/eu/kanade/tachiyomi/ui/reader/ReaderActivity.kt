@@ -532,13 +532,53 @@ class ReaderActivity : BaseActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_N) {
+        // Next chapter - configurable, falls back to hardcoded N
+        val nextChapterKey = readerPreferences.keyBindingNextChapter().get()
+        if ((nextChapterKey != -1 && keyCode == nextChapterKey) || (nextChapterKey == -1 && keyCode == KeyEvent.KEYCODE_N)) {
             loadNextChapter()
             return true
-        } else if (keyCode == KeyEvent.KEYCODE_P) {
+        }
+
+        // Previous chapter - configurable, falls back to hardcoded P
+        val prevChapterKey = readerPreferences.keyBindingPreviousChapter().get()
+        if ((prevChapterKey != -1 && keyCode == prevChapterKey) || (prevChapterKey == -1 && keyCode == KeyEvent.KEYCODE_P)) {
             loadPreviousChapter()
             return true
         }
+
+        val toggleDoublePageKey = readerPreferences.keyBindingToggleDoublePage().get()
+        if (toggleDoublePageKey != -1 && keyCode == toggleDoublePageKey) {
+            if (readerPreferences.pageLayout().get() == PagerConfig.PageLayout.AUTOMATIC) {
+                (viewModel.state.value.viewer as? PagerViewer)?.config?.let { config ->
+                    config.doublePages = !config.doublePages
+                    reloadChapters(config.doublePages, true)
+                }
+            } else {
+                readerPreferences.pageLayout().set(1 - readerPreferences.pageLayout().get())
+            }
+            return true
+        }
+
+        val shiftPageKey = readerPreferences.keyBindingShiftPage().get()
+        if (shiftPageKey != -1 && keyCode == shiftPageKey) {
+            shiftDoublePages()
+            return true
+        }
+
+        val cropBordersKey = readerPreferences.keyBindingCropBorders().get()
+        if (cropBordersKey != -1 && keyCode == cropBordersKey) {
+            val enabled = viewModel.toggleCropBorders()
+            menuToggleToast?.cancel()
+            menuToggleToast = toast(if (enabled) MR.strings.on else MR.strings.off)
+            return true
+        }
+
+        val toggleMenuKey = readerPreferences.keyBindingToggleMenu().get()
+        if (toggleMenuKey != -1 && keyCode == toggleMenuKey) {
+            toggleMenu()
+            return true
+        }
+
         return super.onKeyUp(keyCode, event)
     }
 

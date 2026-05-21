@@ -157,6 +157,10 @@ object SettingsLibraryScreen : SearchableSettings {
                     preference = autoUpdateIntervalPref,
                     entries = persistentMapOf(
                         0 to stringResource(MR.strings.update_never),
+                        1 to "Every hour",
+                        2 to "Every 2 hours",
+                        3 to "Every 3 hours",
+                        6 to "Every 6 hours",
                         12 to stringResource(MR.strings.update_12hour),
                         24 to stringResource(MR.strings.update_24hour),
                         48 to stringResource(MR.strings.update_48hour),
@@ -224,6 +228,25 @@ object SettingsLibraryScreen : SearchableSettings {
                 Preference.PreferenceItem.SwitchPreference(
                     preference = libraryPreferences.newShowUpdatesCount(),
                     title = stringResource(MR.strings.pref_library_update_show_tab_badge),
+                ),
+                Preference.PreferenceItem.TextPreference(
+                    title = "Schedule background update in 5 minutes",
+                    subtitle = "For testing background sync",
+                    onClick = {
+                        val request = androidx.work.OneTimeWorkRequestBuilder<eu.kanade.tachiyomi.data.library.LibraryUpdateJob>()
+                            .addTag("LibraryUpdate")
+                            .addTag("LibraryUpdate-manual")
+                            .setInitialDelay(5, java.util.concurrent.TimeUnit.MINUTES)
+                            .setInputData(
+                                androidx.work.workDataOf("target" to "CHAPTERS")
+                            )
+                            .build()
+                        androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
+                            "LibraryUpdate-test",
+                            androidx.work.ExistingWorkPolicy.REPLACE,
+                            request,
+                        )
+                    },
                 ),
             ),
         )

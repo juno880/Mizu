@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import eu.kanade.presentation.manga.components.ManageTagsDialog
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.unit.dp
 import kotlinx.collections.immutable.persistentListOf
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -112,7 +115,10 @@ data object FollowingTab : Tab {
         val haptic = LocalHapticFeedback.current
 
         val screenModel = rememberScreenModel(tag = "following") {
-            LibraryScreenModel(tagFilter = "Following")
+            LibraryScreenModel(
+                tagFilter = "Following",
+                forceGroupType = tachiyomi.domain.library.model.LibraryGroup.UNGROUPED,
+            )
         }
         val settingsScreenModel = rememberScreenModel(tag = "following_settings") {
             LibrarySettingsScreenModel()
@@ -124,14 +130,9 @@ data object FollowingTab : Tab {
         val onClickRefresh: (Category?) -> Boolean = { category ->
             val started = LibraryUpdateJob.startNow(
                 context = context,
-                category = if (state.groupType == LibraryGroup.BY_DEFAULT) category else null,
-                group = state.groupType,
-                groupExtra = when (state.groupType) {
-                    LibraryGroup.BY_DEFAULT -> null
-                    LibraryGroup.BY_SOURCE, LibraryGroup.BY_TRACK_STATUS -> category?.id?.toString()
-                    LibraryGroup.BY_STATUS -> category?.id?.minus(1)?.toString()
-                    else -> null
-                },
+                category = null,
+                group = LibraryGroup.BY_DEFAULT,
+                groupExtra = null,
             )
             scope.launch {
                 val msgRes = when {
@@ -183,6 +184,7 @@ data object FollowingTab : Tab {
                     onSearchQueryChange = screenModel::search,
                     scrollBehavior = scrollBehavior.takeIf { !state.showCategoryTabs },
                 )
+                androidx.compose.material3.HorizontalDivider()
             },
             bottomBar = {
                 LibraryBottomActionMenu(
@@ -227,14 +229,35 @@ data object FollowingTab : Tab {
                 }
 
                 else -> {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .padding(top = contentPadding.calculateTopPadding())
+                            .height(52.dp),
+                        contentAlignment = androidx.compose.ui.Alignment.CenterStart,
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = "Waiting for new chapters",
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
+                            color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier.padding(top = contentPadding.calculateTopPadding() + 52.dp),
+                    ) {
+                        androidx.compose.material3.HorizontalDivider()
+                    }
                     LibraryContent(
                         categories = state.displayedCategories,
                         searchQuery = state.searchQuery,
                         selection = state.selection,
-                        contentPadding = contentPadding,
+                        contentPadding = PaddingValues(
+                            top = contentPadding.calculateTopPadding() + 48.dp,
+                            bottom = contentPadding.calculateBottomPadding(),
+                        ),
                         currentPage = state.coercedActiveCategoryIndex,
                         hasActiveFilters = state.hasActiveFilters,
-                        showPageTabs = state.showCategoryTabs || !state.searchQuery.isNullOrEmpty(),
+                        showPageTabs = false,
                         onChangeCurrentPage = screenModel::updateActiveCategoryIndex,
                         onClickManga = { navigator.push(MangaScreen(it)) },
                         onContinueReadingClicked = { it: LibraryManga ->
@@ -311,12 +334,16 @@ data object FollowingTab : Tab {
                     allTags = dialog.allTags,
                     mangaTags = persistentListOf(),
                     onDismiss = onDismissRequest,
-                    onConfirm = { tagIds ->
-                        screenModel.bulkSetTags(tagIds)
-                        onDismissRequest()
-                    },
+                    onConfirm = {},
                     onCreateTag = { name -> screenModel.createAndAddTag(name) },
                     onDeleteTag = { tagId -> screenModel.deleteTag(tagId) },
+                    selectedAll = dialog.selectedAll,
+                    selectedSome = dialog.selectedSome,
+                    isBulk = true,
+                    onBulkConfirm = { addIds, removeIds ->
+                        screenModel.bulkSetTags(addIds, removeIds)
+                        onDismissRequest()
+                    },
                 )
             }
             is LibraryScreenModel.Dialog.RecommendationSearchSheet -> {

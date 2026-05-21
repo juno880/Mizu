@@ -120,11 +120,15 @@ class ReaderPreferences(
     fun grayscale() = preferenceStore.getBoolean("pref_grayscale", false)
 
     fun invertedColors() = preferenceStore.getBoolean("pref_inverted_colors", false)
-
     // endregion
 
     // region Controls
-
+    fun keyBindingToggleDoublePage() = preferenceStore.getInt("key_binding_toggle_double_page", -1)
+    fun keyBindingShiftPage() = preferenceStore.getInt("key_binding_shift_page", -1)
+    fun keyBindingCropBorders() = preferenceStore.getInt("key_binding_crop_borders", -1)
+    fun keyBindingToggleMenu() = preferenceStore.getInt("key_binding_toggle_menu", -1)
+    fun keyBindingNextChapter() = preferenceStore.getInt("key_binding_next_chapter", -1)
+    fun keyBindingPreviousChapter() = preferenceStore.getInt("key_binding_previous_chapter", -1)
     fun readWithLongTap() = preferenceStore.getBoolean("reader_long_tap", true)
 
     fun readWithVolumeKeys() = preferenceStore.getBoolean("reader_volume_keys", false)

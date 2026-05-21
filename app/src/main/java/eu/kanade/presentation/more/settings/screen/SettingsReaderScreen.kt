@@ -3,6 +3,23 @@ package eu.kanade.presentation.more.settings.screen
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Text
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.key
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import eu.kanade.presentation.more.settings.Preference
@@ -102,6 +119,7 @@ object SettingsReaderScreen : SearchableSettings {
             // SY -->
             getPageDownloadingGroup(readerPreferences = readerPref),
             getForkSettingsGroup(readerPreferences = readerPref),
+            getKeyBindingsGroup(readerPreferences = readerPref),
             // SY <--
         )
     }
@@ -616,5 +634,100 @@ object SettingsReaderScreen : SearchableSettings {
             ),
         )
     }
-    // SY <--
+
+    @Composable
+    private fun getKeyBindingsGroup(readerPreferences: ReaderPreferences): Preference.PreferenceGroup {
+        return Preference.PreferenceGroup(
+            title = "Controller key bindings",
+            preferenceItems = persistentListOf(
+                Preference.PreferenceItem.CustomPreference(title = "Toggle double page") {
+                    KeyBindingRow(label = "Toggle double page", preference = readerPreferences.keyBindingToggleDoublePage())
+                },
+                Preference.PreferenceItem.CustomPreference(title = "Shift double pages") {
+                    KeyBindingRow(label = "Shift double pages", preference = readerPreferences.keyBindingShiftPage())
+                },
+                Preference.PreferenceItem.CustomPreference(title = "Crop borders") {
+                    KeyBindingRow(label = "Crop borders", preference = readerPreferences.keyBindingCropBorders())
+                },
+                Preference.PreferenceItem.CustomPreference(title = "Toggle menu") {
+                    KeyBindingRow(label = "Toggle menu", preference = readerPreferences.keyBindingToggleMenu())
+                },
+                Preference.PreferenceItem.CustomPreference(title = "Next chapter") {
+                    KeyBindingRow(label = "Next chapter", preference = readerPreferences.keyBindingNextChapter())
+                },
+                Preference.PreferenceItem.CustomPreference(title = "Previous chapter") {
+                    KeyBindingRow(label = "Previous chapter", preference = readerPreferences.keyBindingPreviousChapter())
+                },
+            ),
+        )
+    }
+
+    @Composable
+    private fun KeyBindingRow(
+        label: String,
+        preference: tachiyomi.core.common.preference.Preference<Int>,
+    ) {
+        val currentKey by preference.collectAsState()
+        val showDialogState = remember { androidx.compose.runtime.mutableStateOf(false) }
+        val focusRequester = remember { FocusRequester() }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = label,
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyLarge,
+                )
+                Text(
+                    text = if (currentKey == -1) "Not set" else AndroidKeyEvent.keyCodeToString(currentKey).removePrefix("KEYCODE_"),
+                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                    color = androidx.compose.material3.MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = { showDialogState.value = true }) {
+                Text("Set key")
+            }
+            if (currentKey != -1) {
+                androidx.compose.material3.TextButton(onClick = { preference.set(-1) }) {
+                    Text("Clear")
+                }
+            }
+        }
+
+        if (showDialogState.value) {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showDialogState.value = false },
+                title = { Text("Press a key") },
+                text = {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(focusRequester)
+                            .focusable()
+                            .onKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyUp) {
+                                    preference.set(keyEvent.nativeKeyEvent.keyCode)
+                                    showDialogState.value = false
+                                    true
+                                } else false
+                            },
+                        contentAlignment = androidx.compose.ui.Alignment.Center,
+                    ) {
+                        Text("Press the key you want to assign...")
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(onClick = { showDialogState.value = false }) {
+                        Text("Cancel")
+                    }
+                },
+            )
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                focusRequester.requestFocus()
+            }
+        }
+    }
+// SY <--
 }
