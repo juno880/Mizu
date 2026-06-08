@@ -944,6 +944,21 @@ class ReaderViewModel @JvmOverloads constructor(
     /**
      * Updates the orientation type for the open manga.
      */
+    // Mizu -->
+    fun setAutoShiftDoublePages(enabled: Boolean) {
+        val manga = manga ?: return
+        viewModelScope.launchIO {
+            setMangaViewerFlags.awaitSetAutoShiftDoublePages(manga.id, enabled)
+            val newFlags = if (enabled) {
+                manga.viewerFlags and 0x40L.inv()
+            } else {
+                manga.viewerFlags or 0x40L
+            }
+            mutableState.update { it.copy(manga = manga.copy(viewerFlags = newFlags)) }
+        }
+    }
+    // Mizu <--
+
     fun setMangaOrientationType(orientation: ReaderOrientation) {
         val manga = manga ?: return
         viewModelScope.launchIO {

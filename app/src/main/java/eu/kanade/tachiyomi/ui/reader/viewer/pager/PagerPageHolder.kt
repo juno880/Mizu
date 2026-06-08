@@ -282,7 +282,10 @@ class PagerPageHolder(
         }
 
         scope.launch { progressIndicator?.setProgress(96) }
-        if (imageBitmap.height < imageBitmap.width) {
+        // Mizu --> skip isolation for first page if joinFirstPage is enabled
+        val skipIsolation = viewer.config.joinFirstPage && page.index == 0
+        // Mizu <--
+        if (!skipIsolation && imageBitmap.height < imageBitmap.width) {
             imageSource2.close()
             page.fullPage = true
             splitDoublePages()

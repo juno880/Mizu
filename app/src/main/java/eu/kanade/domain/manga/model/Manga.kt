@@ -21,6 +21,13 @@ val Manga.readingMode: Long
 val Manga.readerOrientation: Long
     get() = viewerFlags and ReaderOrientation.MASK.toLong()
 
+// Mizu -->
+const val DISABLE_AUTO_SHIFT_DOUBLE_PAGES_FLAG = 0x40L
+
+val Manga.autoShiftDoublePages: Boolean
+    get() = viewerFlags and DISABLE_AUTO_SHIFT_DOUBLE_PAGES_FLAG == 0L
+// Mizu <--
+
 val Manga.downloadedFilter: TriState
     get() {
         if (Injekt.get<BasePreferences>().downloadedOnly().get()) return TriState.ENABLED_IS

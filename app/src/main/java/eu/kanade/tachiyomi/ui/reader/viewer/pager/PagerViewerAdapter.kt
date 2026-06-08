@@ -299,9 +299,15 @@ class PagerViewerAdapter(private val viewer: PagerViewer) : ViewPagerAdapter() {
                             // For example if Page 1 is full, Page 0 needs to be isolated
                             // No need to take account shifted pages, because null additions should
                             // always have an odd index in the list
-                            items[itemIndex - 1]?.isolatedPage = true
-                            items.add(itemIndex, null)
-                            itemIndex++
+                            // Mizu --> skip isolating page 0 if joinFirstPage is enabled
+                            val prevPage = items[itemIndex - 1]
+                            val skipIsolate = viewer.config.joinFirstPage && prevPage?.index == 0
+                            if (!skipIsolate) {
+                                prevPage?.isolatedPage = true
+                                items.add(itemIndex, null)
+                                itemIndex++
+                            }
+                            // Mizu <--
                         }
                         itemIndex++
                     }

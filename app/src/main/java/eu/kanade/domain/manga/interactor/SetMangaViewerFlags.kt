@@ -1,5 +1,6 @@
 package eu.kanade.domain.manga.interactor
 
+import eu.kanade.domain.manga.model.DISABLE_AUTO_SHIFT_DOUBLE_PAGES_FLAG
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
 import eu.kanade.tachiyomi.ui.reader.setting.ReadingMode
 import tachiyomi.domain.manga.model.MangaUpdate
@@ -28,6 +29,18 @@ class SetMangaViewerFlags(
             ),
         )
     }
+
+    // Mizu -->
+    suspend fun awaitSetAutoShiftDoublePages(id: Long, enabled: Boolean) {
+        val manga = mangaRepository.getMangaById(id)
+        val newFlags = if (enabled) {
+            manga.viewerFlags and DISABLE_AUTO_SHIFT_DOUBLE_PAGES_FLAG.inv()
+        } else {
+            manga.viewerFlags or DISABLE_AUTO_SHIFT_DOUBLE_PAGES_FLAG
+        }
+        mangaRepository.update(MangaUpdate(id = id, viewerFlags = newFlags))
+    }
+    // Mizu <--
 
     private fun Long.setFlag(flag: Long, mask: Long): Long {
         return this and mask.inv() or (flag and mask)

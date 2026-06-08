@@ -68,6 +68,10 @@ class PagerConfig(
 
     var invertDoublePages = false
 
+    // Mizu -->
+    var joinFirstPage = false
+    // Mizu <--
+
     var autoDoublePages = readerPreferences.pageLayout().get() == PageLayout.AUTOMATIC
 
     @ColorInt

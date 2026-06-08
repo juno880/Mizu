@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import eu.kanade.domain.manga.model.autoShiftDoublePages
 import eu.kanade.domain.manga.model.readerOrientation
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.tachiyomi.ui.reader.setting.ReaderOrientation
@@ -53,6 +54,16 @@ internal fun ColumnScope.ReadingModePage(screenModel: ReaderSettingsScreenModel)
     }
 
     val viewer by screenModel.viewerFlow.collectAsState()
+
+    // Mizu -->
+    val autoShiftDoublePages = remember(manga) { manga?.autoShiftDoublePages ?: true }
+    CheckboxItem(
+        label = "Join first page with second",
+        checked = autoShiftDoublePages,
+        onClick = { screenModel.onChangeAutoShiftDoublePages(!autoShiftDoublePages) },
+    )
+    // Mizu <--
+
     if (viewer is WebtoonViewer) {
         WebtoonViewerSettings(screenModel)
         // SY -->

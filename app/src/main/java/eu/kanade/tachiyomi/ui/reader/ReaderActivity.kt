@@ -56,6 +56,7 @@ import com.davemorrissey.labs.subscaleview.SubsamplingScaleImageView
 import com.google.android.material.transition.platform.MaterialContainerTransform
 import com.hippo.unifile.UniFile
 import eu.kanade.domain.base.BasePreferences
+import eu.kanade.domain.manga.model.autoShiftDoublePages
 import eu.kanade.domain.manga.model.readingMode
 import eu.kanade.presentation.reader.ChapterListDialog
 import eu.kanade.presentation.reader.DisplayRefreshHost
@@ -271,7 +272,7 @@ class ReaderActivity : BaseActivity() {
             .launchIn(lifecycleScope)
 
         viewModel.state
-            .map { it.manga }
+            .map { it.manga?.readingMode }
             .distinctUntilChanged()
             .filterNotNull()
             .onEach { updateViewer() }
@@ -327,6 +328,9 @@ class ReaderActivity : BaseActivity() {
                 readerState = viewModel.state,
                 onChangeReadingMode = viewModel::setMangaReadingMode,
                 onChangeOrientation = viewModel::setMangaOrientationType,
+                // Mizu -->
+                onChangeAutoShiftDoublePages = viewModel::setAutoShiftDoublePages,
+                // Mizu <--
             )
         }
 
@@ -950,6 +954,8 @@ class ReaderActivity : BaseActivity() {
                 setDoublePageMode(newViewer)
             }
             viewModel.state.value.lastShiftDoubleState?.let { newViewer.config.shiftDoublePage = it }
+            // Mizu --> removed, shift now applied in setChapters
+            // Mizu <--
         }
 
         val manga = viewModel.state.value.manga
@@ -1049,6 +1055,15 @@ class ReaderActivity : BaseActivity() {
         // SY <--
 
         viewModel.state.value.viewer?.setChapters(viewerChapters)
+
+        // Mizu --> apply shift after chapters are set
+        val manga = viewModel.state.value.manga
+        android.util.Log.d("MIZU", "setChapters called, autoShift=${manga?.autoShiftDoublePages}, requestedPage=${viewerChapters.currChapter.requestedPage}")
+        if (manga?.autoShiftDoublePages == true && viewerChapters.currChapter.requestedPage == 0) {
+            android.util.Log.d("MIZU", "calling shiftDoublePages")
+            shiftDoublePages()
+        }
+        // Mizu <--
 
         lifecycleScope.launchIO {
             viewModel.getChapterUrl()?.let { url ->

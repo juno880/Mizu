@@ -433,6 +433,10 @@ private fun MangaScreenSmallImpl(
                 onDownloadChapter = onDownloadChapter,
                 onMultiDeleteClicked = onMultiDeleteClicked,
                 fillFraction = 1f,
+                // Mizu -->
+                onChapterIncognitoClicked = onChapterIncognitoClicked,
+                onClearSelection = { onAllChapterSelected(false) },
+                // Mizu <--
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
@@ -774,6 +778,10 @@ fun MangaScreenLargeImpl(
                     onDownloadChapter = onDownloadChapter,
                     onMultiDeleteClicked = onMultiDeleteClicked,
                     fillFraction = 0.5f,
+                    // Mizu -->
+                    onChapterIncognitoClicked = onChapterIncognitoClicked,
+                    onClearSelection = { onAllChapterSelected(false) },
+                    // Mizu <--
                 )
             }
         },
@@ -967,6 +975,10 @@ private fun SharedMangaBottomActionMenu(
     onDownloadChapter: ((List<ChapterList.Item>, ChapterDownloadAction) -> Unit)?,
     onMultiDeleteClicked: (List<Chapter>) -> Unit,
     fillFraction: Float,
+    // Mizu -->
+    onChapterIncognitoClicked: (Chapter) -> Unit,
+    onClearSelection: () -> Unit,
+    // Mizu <--
     modifier: Modifier = Modifier,
 ) {
     MangaBottomActionMenu(
@@ -997,6 +1009,12 @@ private fun SharedMangaBottomActionMenu(
         }.takeIf {
             selected.fastAny { it.downloadState == Download.State.DOWNLOADED }
         },
+        // Mizu -->
+        onReadIncognitoClicked = {
+            onChapterIncognitoClicked(selected[0].chapter)
+            onClearSelection()
+        }.takeIf { selected.size == 1 },
+        // Mizu <--
     )
 }
 
@@ -1035,10 +1053,7 @@ private fun LazyListScope.sharedChapterItems(
                 MissingChapterCountListItem(count = item.count)
             }
             is ChapterList.Item -> {
-                // Mizu --> context menu state for incognito option
-                var showContextMenu by remember { mutableStateOf(false) }
-                // Mizu <--
-                MangaChapterListItem(
+MangaChapterListItem(
                     title = if (manga.displayMode == Manga.CHAPTER_DISPLAY_NUMBER) {
                         stringResource(
                             MR.strings.display_mode_chapter,
@@ -1085,13 +1100,7 @@ private fun LazyListScope.sharedChapterItems(
                     chapterSwipeStartAction = chapterSwipeStartAction,
                     chapterSwipeEndAction = chapterSwipeEndAction,
                     onLongClick = {
-                        // Mizu --> show context menu when not in multi-select
-                        if (!isAnyChapterSelected) {
-                            showContextMenu = true
-                        } else {
-                            onChapterSelected(item, !item.selected, true)
-                        }
-                        // Mizu <--
+                        onChapterSelected(item, !item.selected, true)
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     },
                     onClick = {
@@ -1111,34 +1120,6 @@ private fun LazyListScope.sharedChapterItems(
                         onChapterSwipe(item, it)
                     },
                 )
-                // Mizu --> incognito context menu
-                androidx.compose.material3.DropdownMenu(
-                    expanded = showContextMenu,
-                    onDismissRequest = { showContextMenu = false },
-                ) {
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(stringResource(MR.strings.action_read)) },
-                        onClick = {
-                            showContextMenu = false
-                            onChapterClicked(item.chapter)
-                        },
-                    )
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(stringResource(MR.strings.pref_incognito_mode)) },
-                        onClick = {
-                            showContextMenu = false
-                            onChapterIncognitoClicked(item.chapter)
-                        },
-                    )
-                    androidx.compose.material3.DropdownMenuItem(
-                        text = { Text(stringResource(MR.strings.action_select)) },
-                        onClick = {
-                            showContextMenu = false
-                            onChapterSelected(item, true, false)
-                        },
-                    )
-                }
-                // Mizu <--
             }
         }
     }
