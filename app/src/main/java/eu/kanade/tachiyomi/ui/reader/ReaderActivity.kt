@@ -147,6 +147,9 @@ class ReaderActivity : BaseActivity() {
             chapterId: Long?,
             /* SY --> */
             page: Int? = null, /* SY <-- */
+            // Mizu -->
+            incognito: Boolean = false,
+            // Mizu <--
         ): Intent {
             return Intent(context, ReaderActivity::class.java).apply {
                 putExtra("manga", mangaId)
@@ -154,6 +157,9 @@ class ReaderActivity : BaseActivity() {
                 // SY -->
                 putExtra("page", page)
                 // SY <--
+                // Mizu -->
+                putExtra("incognito", incognito)
+                // Mizu <--
                 addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             }
         }
@@ -218,6 +224,12 @@ class ReaderActivity : BaseActivity() {
         binding = ReaderActivityBinding.inflate(layoutInflater)
         setContentView(binding.root)
         binding.setComposeOverlay()
+
+        // Mizu --> activate per-chapter incognito if launched that way
+        if (intent.extras?.getBoolean("incognito", false) == true) {
+            preferences.incognitoMode().set(true)
+        }
+        // Mizu <--
 
         if (viewModel.needsInit()) {
             val manga = intent.extras?.getLong("manga", -1) ?: -1L
@@ -477,6 +489,11 @@ class ReaderActivity : BaseActivity() {
         config = null
         menuToggleToast?.cancel()
         readingModeToast?.cancel()
+        // Mizu --> restore incognito state if we set it for this chapter only
+        if (intent.extras?.getBoolean("incognito", false) == true) {
+            preferences.incognitoMode().set(false)
+        }
+        // Mizu <--
     }
 
     override fun onPause() {

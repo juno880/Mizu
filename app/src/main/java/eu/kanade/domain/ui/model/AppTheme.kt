@@ -27,4 +27,8 @@ enum class AppTheme(val titleRes: StringResource?) {
     // SY -->
     PURE_RED(null),
     // SY <--
+
+    // Mizu -->
+    MIZU(MR.strings.theme_mizu),
+    // Mizu <--
 }

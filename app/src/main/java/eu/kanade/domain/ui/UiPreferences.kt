@@ -30,7 +30,7 @@ class UiPreferences(
         if (DeviceUtil.isDynamicColorAvailable) {
             AppTheme.MONET
         } else {
-            AppTheme.DEFAULT
+            AppTheme.MIZU
         },
     )
 
@@ -69,6 +69,10 @@ class UiPreferences(
     fun showNavFollowing() = preferenceStore.getBoolean("pref_show_following_button", false)
 
     // SY <--
+
+    // Mizu -->
+    fun highlightColor() = preferenceStore.getString("pref_highlight_color", "#0d2137")
+    // Mizu <--
 
     companion object {
         fun dateFormat(format: String): DateTimeFormatter = when (format) {

@@ -157,6 +157,9 @@ class MangaScreen(
             chapterSwipeEndAction = screenModel.chapterSwipeEndAction,
             navigateUp = navigator::pop,
             onChapterClicked = { openChapter(context, it) },
+            // Mizu -->
+            onChapterIncognitoClicked = { openChapterIncognito(context, it) },
+            // Mizu <--
             onDownloadChapter = screenModel::runChapterDownloadActions.takeIf { !successState.source.isLocalOrStub() },
             onAddToLibraryClicked = {
                 screenModel.toggleFavorite()
@@ -395,6 +398,12 @@ class MangaScreen(
     private fun openChapter(context: Context, chapter: Chapter) {
         context.startActivity(ReaderActivity.newIntent(context, chapter.mangaId, chapter.id))
     }
+
+    // Mizu -->
+    private fun openChapterIncognito(context: Context, chapter: Chapter) {
+        context.startActivity(ReaderActivity.newIntent(context, chapter.mangaId, chapter.id, incognito = true))
+    }
+    // Mizu <--
 
     private fun getMangaUrl(manga_: Manga?, source_: Source?): String? {
         val manga = manga_ ?: return null

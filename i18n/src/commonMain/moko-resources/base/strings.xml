@@ -107,6 +107,11 @@
     <string name="action_remove_everything">Remove everything</string>
     <string name="action_start">Start</string>
     <string name="action_resume">Resume</string>
+    <!-- Mizu -->
+    <string name="action_read">Read</string>
+    <string name="action_select">Select</string>
+    <string name="theme_mizu">Mizu</string>
+    <!-- Mizu -->
     <string name="action_open_in_browser">Open in browser</string>
     <string name="action_show_manga">Show entry</string>
     <string name="action_copy_to_clipboard">Copy to clipboard</string>
