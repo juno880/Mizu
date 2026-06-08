@@ -256,16 +256,23 @@ class PagerPageHolder(
 
     private fun mergePages(imageSource: BufferedSource, imageSource2: BufferedSource?): BufferedSource {
         // Handle adding a center margin to wide images if requested
+        android.util.Log.d("MIZU_MERGE", "mergePages: page=${page.index} extra=${extraPage?.index} joinFirst=${viewer.config.joinFirstPage} fullPage=${page.fullPage} src2null=${imageSource2 == null}")
         if (imageSource2 == null) {
+            android.util.Log.d("MIZU_MERGE", "-> src2 null, handleWideImage")
             return handleWideImage(imageSource)
         }
 
-        if (page.fullPage) return imageSource
+        if (page.fullPage) {
+            android.util.Log.d("MIZU_MERGE", "-> already fullPage, solo")
+            return imageSource
+        }
         if (ImageUtil.isAnimatedAndSupported(imageSource)) {
+            android.util.Log.d("MIZU_MERGE", "-> page animated, split")
             page.fullPage = true
             splitDoublePages()
             return imageSource
         } else if (ImageUtil.isAnimatedAndSupported(imageSource2)) {
+            android.util.Log.d("MIZU_MERGE", "-> extra animated, split")
             page.isolatedPage = true
             extraPage?.fullPage = true
             splitDoublePages()
@@ -278,6 +285,7 @@ class PagerPageHolder(
             page.fullPage = true
             splitDoublePages()
             logcat(LogPriority.ERROR) { "Cannot combine pages" }
+            android.util.Log.d("MIZU_MERGE", "-> imageBitmap null, split")
             return imageSource
         }
 
@@ -285,10 +293,12 @@ class PagerPageHolder(
         // Mizu --> skip isolation for first page if joinFirstPage is enabled
         val skipIsolation = viewer.config.joinFirstPage && page.index == 0
         // Mizu <--
+        android.util.Log.d("MIZU_MERGE", "-> bitmap ${imageBitmap.width}x${imageBitmap.height} skipIsolation=$skipIsolation wide=${imageBitmap.height < imageBitmap.width}")
         if (!skipIsolation && imageBitmap.height < imageBitmap.width) {
             imageSource2.close()
             page.fullPage = true
             splitDoublePages()
+            android.util.Log.d("MIZU_MERGE", "-> page wide, split")
             return imageSource
         }
 
@@ -299,15 +309,18 @@ class PagerPageHolder(
             page.isolatedPage = true
             splitDoublePages()
             logcat(LogPriority.ERROR) { "Cannot combine pages" }
+            android.util.Log.d("MIZU_MERGE", "-> imageBitmap2 null, split")
             return imageSource
         }
 
         scope.launch { progressIndicator?.setProgress(97) }
+        android.util.Log.d("MIZU_MERGE", "-> bitmap2 ${imageBitmap2.width}x${imageBitmap2.height} wide=${imageBitmap2.height < imageBitmap2.width}")
         if (imageBitmap2.height < imageBitmap2.width) {
             imageSource2.close()
             extraPage?.fullPage = true
             page.isolatedPage = true
             splitDoublePages()
+            android.util.Log.d("MIZU_MERGE", "-> extra wide, split")
             return imageSource
         }
 

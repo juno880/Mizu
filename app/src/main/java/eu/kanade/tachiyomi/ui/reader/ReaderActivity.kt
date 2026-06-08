@@ -883,9 +883,13 @@ class ReaderActivity : BaseActivity() {
         if (doublePages) {
             // If we're moving from singe to double, we want the current page to be the first page
             val currentPage = viewModel.state.value.currentPage
-            viewer.config.shiftDoublePage = (
-                currentPage + (currentChapter?.pages?.take(currentPage)?.count { it.fullPage || it.isolatedPage } ?: 0)
-                ) % 2 != 0
+            // Mizu --> don't shift when joinFirstPage is active — shifting breaks page 0 pairing
+            if (!viewer.config.joinFirstPage) {
+                viewer.config.shiftDoublePage = (
+                    currentPage + (currentChapter?.pages?.take(currentPage)?.count { it.fullPage || it.isolatedPage } ?: 0)
+                    ) % 2 != 0
+            }
+            // Mizu <--
         }
         viewModel.state.value.viewerChapters?.let {
             viewer.setChaptersDoubleShift(it)
@@ -954,7 +958,8 @@ class ReaderActivity : BaseActivity() {
                 setDoublePageMode(newViewer)
             }
             viewModel.state.value.lastShiftDoubleState?.let { newViewer.config.shiftDoublePage = it }
-            // Mizu --> removed, shift now applied in setChapters
+            // Mizu --> wire joinFirstPage from manga flag on viewer init
+            newViewer.config.joinFirstPage = viewModel.state.value.manga?.autoShiftDoublePages == true
             // Mizu <--
         }
 
@@ -1054,16 +1059,12 @@ class ReaderActivity : BaseActivity() {
         }
         // SY <--
 
-        viewModel.state.value.viewer?.setChapters(viewerChapters)
-
-        // Mizu --> apply shift after chapters are set
+        // Mizu --> set joinFirstPage config before chapters are laid out
         val manga = viewModel.state.value.manga
-        android.util.Log.d("MIZU", "setChapters called, autoShift=${manga?.autoShiftDoublePages}, requestedPage=${viewerChapters.currChapter.requestedPage}")
-        if (manga?.autoShiftDoublePages == true && viewerChapters.currChapter.requestedPage == 0) {
-            android.util.Log.d("MIZU", "calling shiftDoublePages")
-            shiftDoublePages()
-        }
+        (viewModel.state.value.viewer as? PagerViewer)?.config?.joinFirstPage = manga?.autoShiftDoublePages == true
         // Mizu <--
+
+        viewModel.state.value.viewer?.setChapters(viewerChapters)
 
         lifecycleScope.launchIO {
             viewModel.getChapterUrl()?.let { url ->
