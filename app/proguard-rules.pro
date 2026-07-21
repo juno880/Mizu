@@ -25,9 +25,6 @@
 -keep,allowoptimization class eu.kanade.tachiyomi.network.RequestsKt { public protected *; }
 -keep,allowoptimization class eu.kanade.tachiyomi.AppInfo { public protected *; }
 
-# Debug functions
--keep,allowoptimization class exh.debug.DebugFunctions { public *; }
-
 ##---------------Begin: proguard configuration for RxJava 1.x  ----------
 -dontwarn sun.misc.**
 
@@ -76,14 +73,6 @@
     *** Companion;
 }
 -keepclasseswithmembers class tachiyomi.** {
-    kotlinx.serialization.KSerializer serializer(...);
-}
-
--keep,includedescriptorclasses class exh.**$$serializer { *; }
--keepclassmembers class exh.** {
-    *** Companion;
-}
--keepclasseswithmembers class exh.** {
     kotlinx.serialization.KSerializer serializer(...);
 }
 
@@ -243,8 +232,8 @@
   *** seenExceptions;
 }
 
-# Since Unsafe is using the field offsets of these inner classes, we don't want
-# to have class merging or similar tricks applied to these classes and their
+# Since Unsafe is using the field offsets of these inner classes, we don't want to
+# have class merging or similar tricks applied to these classes and their
 # fields. It's safe to allow obfuscation, since the by-name references are
 # already preserved in the -keep statement above.
 -keep,allowshrinking,allowobfuscation class com.google.common.util.concurrent.AbstractFuture** {
@@ -298,6 +287,5 @@
 -dontwarn org.ietf.jgss.GSSException
 -dontwarn org.ietf.jgss.GSSManager
 -dontwarn org.ietf.jgss.GSSName
--dontwarn org.ietf.jgss.Oid
 -dontwarn com.google.re2j.Matcher
 -dontwarn com.google.re2j.Pattern
