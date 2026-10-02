@@ -65,6 +65,19 @@ class TagRepositoryImpl(
         }
     }
 
+    // Mizu -->
+    override suspend fun setTagsForMangas(mangaTagIds: Map<Long, List<Long>>) {
+        handler.await(inTransaction = true) {
+            mangaTagIds.forEach { (mangaId, tagIds) ->
+                tagQueries.removeAllTagsFromManga(mangaId)
+                tagIds.forEach { tagId ->
+                    tagQueries.addMangaTag(mangaId, tagId)
+                }
+            }
+        }
+    }
+    // Mizu <--
+
     private fun mapTag(id: Long, name: String): Tag {
         return Tag(id = id, name = name)
     }

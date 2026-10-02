@@ -247,7 +247,7 @@ dependencies {
     // Networking
     implementation(libs.bundles.okhttp)
     implementation(libs.okio)
-    implementation(libs.conscrypt.android) // TLS 1.3 support for Android < 10
+    // Mizu: Conscrypt removed (16KB alignment bug, no fixed release; unnecessary on Android 10+)
 
     // Data serialization (JSON, protobuf, xml)
     implementation(kotlinx.bundles.serialization)

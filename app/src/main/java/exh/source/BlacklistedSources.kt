@@ -27,7 +27,11 @@ object BlacklistedSources {
         "eu.kanade.tachiyomi.extension.all.ehentai",
     )
 
+    // Mizu -->
     var HIDDEN_SOURCES = setOf(
         MERGED_SOURCE_ID,
+        EH_SOURCE_ID,
+        EXH_SOURCE_ID,
     )
+    // Mizu <--
 }

@@ -91,6 +91,7 @@ import tachiyomi.domain.manga.interactor.DeleteTag
 import tachiyomi.domain.manga.interactor.GetTags
 import tachiyomi.domain.manga.interactor.RenameTag
 import tachiyomi.domain.manga.interactor.SetTagsForManga
+import tachiyomi.domain.manga.interactor.SetTagsForMangas
 import tachiyomi.domain.manga.repository.MangaRepository
 import tachiyomi.domain.manga.repository.TagRepository
 import tachiyomi.domain.release.interactor.GetApplicationRelease
@@ -129,6 +130,7 @@ class DomainModule : InjektModule {
         addFactory { DeleteTag(get()) }
         addFactory { RenameTag(get()) }
         addFactory { SetTagsForManga(get()) }
+        addFactory { SetTagsForMangas(get()) }
         addFactory { GetDuplicateLibraryManga(get()) }
         addFactory { GetFavorites(get()) }
         addFactory { GetLibraryManga(get()) }

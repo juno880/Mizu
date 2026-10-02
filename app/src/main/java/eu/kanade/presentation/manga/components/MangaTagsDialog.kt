@@ -185,7 +185,7 @@ fun ManageTagsDialog(
                             .keys
                             .filter { it in selectedAll || it in selectedSome }
                             .toList()
-                        onBulkConfirm!!(addIds, removeIds)
+                        onBulkConfirm?.invoke(addIds, removeIds)
                     } else {
                         onConfirm(selectedTagIds.value.toList())
                     }

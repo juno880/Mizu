@@ -103,7 +103,7 @@ import tachiyomi.domain.manga.interactor.GetMergedMangaById
 import tachiyomi.domain.manga.interactor.GetSearchTags
 import tachiyomi.domain.manga.interactor.GetSearchTitles
 import tachiyomi.domain.manga.interactor.GetTags
-import tachiyomi.domain.manga.interactor.SetTagsForManga
+import tachiyomi.domain.manga.interactor.SetTagsForMangas
 import tachiyomi.domain.manga.interactor.SetCustomMangaInfo
 import tachiyomi.domain.manga.model.CustomMangaInfo
 import tachiyomi.domain.manga.model.Manga
@@ -149,7 +149,7 @@ class LibraryScreenModel(
     private val getSearchTags: GetSearchTags = Injekt.get(),
     private val getSearchTitles: GetSearchTitles = Injekt.get(),
     private val getTags: GetTags = Injekt.get(),
-    private val setTagsForManga: SetTagsForManga = Injekt.get(),
+    private val setTagsForMangas: SetTagsForMangas = Injekt.get(),
     private val searchEngine: SearchEngine = Injekt.get(),
     private val setCustomMangaInfo: SetCustomMangaInfo = Injekt.get(),
     private val getMergedChaptersByMangaId: GetMergedChaptersByMangaId = Injekt.get(),
@@ -1369,21 +1369,29 @@ class LibraryScreenModel(
     fun bulkSetTags(addTagIds: List<Long>, removeTagIds: List<Long>) {
         val mangaList = state.value.selectedManga
         screenModelScope.launchNonCancellable {
-            mangaList.forEach { manga ->
-                try {
+            try {
+                // Mizu -->
+                // Compute the new tag list per manga first (reads), then write
+                // everything in two batched calls instead of one transaction
+                // per manga — much faster for large bulk selections.
+                val newTagsByManga = mangaList.associate { manga ->
                     val currentTags = getTags.awaitForManga(manga.id).map { it.id }.toMutableList()
                     currentTags.addAll(addTagIds.filter { it !in currentTags })
                     currentTags.removeAll(removeTagIds.toSet())
-                    setTagsForManga.await(manga.id, currentTags)
-                    updateManga.await(
+                    manga.id to currentTags
+                }
+                setTagsForMangas.await(newTagsByManga)
+                updateManga.awaitAll(
+                    mangaList.map { manga ->
                         tachiyomi.domain.manga.model.MangaUpdate(
                             id = manga.id,
                             version = manga.version + 1,
                         )
-                    )
-                } catch (e: Exception) {
-                    logcat(LogPriority.ERROR, e) { "Failed to set tags for manga ${manga.id}" }
-                }
+                    },
+                )
+                // Mizu <--
+            } catch (e: Exception) {
+                logcat(LogPriority.ERROR, e) { "Failed to bulk set tags" }
             }
         }
         clearSelection()

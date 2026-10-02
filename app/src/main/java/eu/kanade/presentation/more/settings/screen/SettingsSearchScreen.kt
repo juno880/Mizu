@@ -295,7 +295,7 @@ private val settingScreens = listOf(
     SettingsDataScreen,
     SettingsSecurityScreen,
     // SY -->
-    SettingsEhScreen,
+    // Mizu: SettingsEhScreen removed
     SettingsMangadexScreen,
     // SY <--
     SettingsAdvancedScreen,

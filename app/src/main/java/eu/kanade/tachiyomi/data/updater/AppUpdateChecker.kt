@@ -13,6 +13,14 @@ class AppUpdateChecker {
     private val getApplicationRelease: GetApplicationRelease by injectLazy()
 
     suspend fun checkForUpdate(context: Context, forceCheck: Boolean = false): GetApplicationRelease.Result {
+        // Mizu -->
+        // App update checks disabled: this fork's releases aren't tagged with
+        // comparable version numbers, and the upstream check was prompting
+        // installs of the official TachiyomiSY APK over this fork.
+        return GetApplicationRelease.Result.NoNewUpdate
+        // Mizu <--
+
+        /*
         // Disable app update checks for older Android versions that we're going to drop support for
         // if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
         //     return GetApplicationRelease.Result.OsTooOld
@@ -41,6 +49,7 @@ class AppUpdateChecker {
 
             result
         }
+        */
     }
 }
 

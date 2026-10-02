@@ -22,3 +22,6 @@ google-services.json
 
 keystore.properties
 mizu.jks
+
+# Accidentally committed build outputs (baseline profiles, APK metadata)
+app/standard/

@@ -28,4 +28,11 @@ interface TagRepository {
     suspend fun removeAllTagsFromManga(mangaId: Long)
 
     suspend fun setTagsForManga(mangaId: Long, tagIds: List<Long>)
+
+    // Mizu -->
+    // Sets tags for multiple manga in a single database transaction, instead of
+    // one transaction per manga. Used by bulk-tag operations (e.g. library
+    // multi-select) to avoid a separate commit per manga.
+    suspend fun setTagsForMangas(mangaTagIds: Map<Long, List<Long>>)
+    // Mizu <--
 }
