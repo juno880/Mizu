@@ -12,15 +12,46 @@ class CreateExtensionRepo(
     private val repository: ExtensionRepoRepository,
     private val service: ExtensionRepoService,
 ) {
-    private val repoRegex = """^https://.*/index\.min\.json$""".toRegex()
+    // Mizu -->
+    // Known index file suffixes repos are commonly shared with. Whichever one
+    // (if any) the pasted URL ends with gets stripped to recover the base repo
+    // URL, since fetchRepoDetails() only ever needs the base URL.
+    private val knownIndexSuffixes = listOf("/index.min.json", "/index.pb", "/index.json", "/repo.json")
+
+    private val githubRawRegex =
+        """^https://github\.com/([^/]+)/([^/]+)/raw/([^/]+)/(.*)$""".toRegex()
+
+    /**
+     * `https://github.com/{owner}/{repo}/raw/{ref}/{path}` doesn't reliably serve
+     * raw file content for all HTTP clients — convert it to the direct CDN form:
+     * `https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}`
+     */
+    private fun String.toRawGithubusercontentIfNeeded(): String {
+        val match = githubRawRegex.matchEntire(this) ?: return this
+        val (owner, repo, ref, path) = match.destructured
+        return "https://raw.githubusercontent.com/$owner/$repo/$ref/$path"
+    }
+    // Mizu <--
 
     suspend fun await(indexUrl: String): Result {
-        val formattedIndexUrl = indexUrl.toHttpUrlOrNull()
-            ?.toString()
-            ?.takeIf { it.matches(repoRegex) }
+        val formattedUrl = indexUrl.toHttpUrlOrNull()?.toString()
             ?: return Result.InvalidUrl
 
-        val baseUrl = formattedIndexUrl.removeSuffix("/index.min.json")
+        // Mizu -->
+        // Accept a URL ending in any known index file name (stripped to get the
+        // base URL) or a bare base repo URL directly — covers the legacy
+        // index.min.json form, the newer index.pb form Keiyoushi now shares,
+        // and a plain base URL with nothing appended. Also normalizes the
+        // github.com/.../raw/... shorthand to raw.githubusercontent.com.
+        val normalizedUrl = formattedUrl.toRawGithubusercontentIfNeeded()
+        val matchedSuffix = knownIndexSuffixes.firstOrNull { normalizedUrl.endsWith(it) }
+        val baseUrl = if (matchedSuffix != null) {
+            normalizedUrl.removeSuffix(matchedSuffix)
+        } else {
+            normalizedUrl.removeSuffix("/")
+        }
+        // Mizu <--
+
         return service.fetchRepoDetails(baseUrl)?.let { insert(it) } ?: Result.InvalidUrl
     }
 

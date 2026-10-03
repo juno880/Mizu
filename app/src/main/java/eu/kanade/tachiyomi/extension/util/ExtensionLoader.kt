@@ -52,7 +52,13 @@ internal object ExtensionLoader {
     private const val METADATA_SOURCE_FACTORY = "tachiyomi.extension.factory"
     private const val METADATA_NSFW = "tachiyomi.extension.nsfw"
     const val LIB_VERSION_MIN = 1.4
-    const val LIB_VERSION_MAX = 1.5
+    // Mizu: raised from 1.5 to 1.6 — Keiyoushi's current extension standard
+    // (KeiSource) is lib 1.6. KeiSource is bundled inside each extension's own
+    // APK (compiled from Keiyoushi's build infra), not something this app
+    // needs to provide — the loader below only ever checks the loaded class
+    // against this app's own stable `Source` interface, never `KeiSource`
+    // directly, so no other changes are needed to support it.
+    const val LIB_VERSION_MAX = 1.6
 
     @Suppress("DEPRECATION")
     private val PACKAGE_FLAGS = PackageManager.GET_CONFIGURATIONS or

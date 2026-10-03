@@ -31,6 +31,10 @@ dependencies {
     api(libs.okhttp.core)
     api(libs.okhttp.logging)
     api(libs.okhttp.brotli)
+    // Mizu: KeiSource (extlib 1.6) extensions (e.g. MangaDex) reference
+    // okhttp3.zstd.Zstd directly; without this on the classpath they fail to
+    // load with NoClassDefFoundError.
+    api(libs.okhttp.zstd)
     api(libs.okhttp.dnsoverhttps)
     api(libs.okio)
 

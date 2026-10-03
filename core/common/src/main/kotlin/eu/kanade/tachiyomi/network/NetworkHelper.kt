@@ -2,12 +2,10 @@ package eu.kanade.tachiyomi.network
 
 import android.content.Context
 import eu.kanade.tachiyomi.network.interceptor.CloudflareInterceptor
-import eu.kanade.tachiyomi.network.interceptor.IgnoreGzipInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UncaughtExceptionInterceptor
 import eu.kanade.tachiyomi.network.interceptor.UserAgentInterceptor
 import okhttp3.Cache
 import okhttp3.OkHttpClient
-import okhttp3.brotli.BrotliInterceptor
 import okhttp3.logging.HttpLoggingInterceptor
 import java.io.File
 import java.util.concurrent.TimeUnit
@@ -38,8 +36,14 @@ open /* SY <-- */ class NetworkHelper(
             )
             .addInterceptor(UncaughtExceptionInterceptor())
             .addInterceptor(UserAgentInterceptor(::defaultUserAgentProvider))
-            .addNetworkInterceptor(IgnoreGzipInterceptor())
-            .addNetworkInterceptor(BrotliInterceptor)
+            // Mizu: IgnoreGzipInterceptor and BrotliInterceptor both removed —
+            // KeiSource (extlib 1.6) extensions assert at construction time
+            // that NEITHER is present on the default client (they handle their
+            // own gzip/brotli decompression internally), crashing the whole
+            // app at source-scan/startup otherwise. Standard OkHttp still
+            // transparently decompresses gzip on its own without these; only
+            // explicit Brotli response support on the shared default client is
+            // lost (unaffected: any source/extension handling its own).
 
         if (isDebugBuild) {
             val httpLoggingInterceptor = HttpLoggingInterceptor().apply {

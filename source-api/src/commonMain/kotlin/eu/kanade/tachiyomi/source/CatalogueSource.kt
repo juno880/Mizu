@@ -2,6 +2,11 @@ package eu.kanade.tachiyomi.source
 
 import eu.kanade.tachiyomi.source.model.FilterList
 import eu.kanade.tachiyomi.source.model.MangasPage
+import eu.kanade.tachiyomi.source.model.SChapter
+import eu.kanade.tachiyomi.source.model.SManga
+import eu.kanade.tachiyomi.source.model.SMangaUpdate
+import kotlinx.coroutines.async
+import kotlinx.coroutines.supervisorScope
 import rx.Observable
 import tachiyomi.core.common.util.lang.awaitSingle
 
@@ -51,6 +56,25 @@ interface CatalogueSource : Source {
     suspend fun getLatestUpdates(page: Int): MangasPage {
         return fetchLatestUpdates(page).awaitSingle()
     }
+
+    // Mizu -->
+    /**
+     * Bridges to [getMangaDetails]/[getChapterList] so 1.5 extensions that override those
+     * methods keep working. KeiSource (extlib 1.6) overrides this instead.
+     *
+     * @since tachiyomix 1.6
+     */
+    override suspend fun getMangaUpdate(
+        manga: SManga,
+        chapters: List<SChapter>,
+        fetchDetails: Boolean,
+        fetchChapters: Boolean,
+    ): SMangaUpdate = supervisorScope {
+        val asyncManga = if (fetchDetails) async { getMangaDetails(manga) } else null
+        val asyncChapters = if (fetchChapters) async { getChapterList(manga) } else null
+        SMangaUpdate(asyncManga?.await() ?: manga, asyncChapters?.await() ?: chapters)
+    }
+    // Mizu <--
 
     /**
      * Returns the list of filters for the source.

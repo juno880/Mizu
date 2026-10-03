@@ -481,9 +481,16 @@ class LibraryUpdateJob(private val context: Context, workerParams: WorkerParamet
     private suspend fun updateManga(manga: Manga, fetchWindow: Pair<Long, Long>): List<Chapter> {
         val source = sourceManager.getOrStub(manga.source)
 
+        // Mizu: getMangaUpdate() used instead of getMangaDetails()/getChapterList()
+        // directly — see MangaScreenModel.fetchMangaFromSource() for why.
         // Update manga metadata if needed
         if (libraryPreferences.autoUpdateMetadata().get()) {
-            val networkManga = source.getMangaDetails(manga.toSManga())
+            val networkManga = source.getMangaUpdate(
+                manga = manga.toSManga(),
+                chapters = emptyList(),
+                fetchDetails = true,
+                fetchChapters = false,
+            ).manga
             updateManga.awaitUpdateFromSource(manga, networkManga, manualFetch = false, coverCache)
         }
 
@@ -491,7 +498,12 @@ class LibraryUpdateJob(private val context: Context, workerParams: WorkerParamet
             return source.fetchChaptersAndSync(manga, false)
         }
 
-        val chapters = source.getChapterList(manga.toSManga())
+        val chapters = source.getMangaUpdate(
+            manga = manga.toSManga(),
+            chapters = emptyList(),
+            fetchDetails = false,
+            fetchChapters = true,
+        ).chapters
 
         // Get manga from database to account for if it was removed during the update and
         // to get latest data so it doesn't get overwritten later on
@@ -522,7 +534,13 @@ class LibraryUpdateJob(private val context: Context, workerParams: WorkerParamet
                                 ) {
                                     val source = sourceManager.get(manga.source) ?: return@withUpdateNotification
                                     try {
-                                        val networkManga = source.getMangaDetails(manga.toSManga())
+                                        // Mizu: see MangaScreenModel.fetchMangaFromSource()
+                                        val networkManga = source.getMangaUpdate(
+                                            manga = manga.toSManga(),
+                                            chapters = emptyList(),
+                                            fetchDetails = true,
+                                            fetchChapters = false,
+                                        ).manga
                                         val updatedManga = manga.prepUpdateCover(
                                             coverCache,
                                             networkManga,

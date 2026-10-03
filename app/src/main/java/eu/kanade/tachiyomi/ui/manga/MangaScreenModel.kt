@@ -514,7 +514,19 @@ class MangaScreenModel(
         val state = successState ?: return
         try {
             withIOContext {
-                val networkManga = state.source.getMangaDetails(state.manga.toSManga())
+                // Mizu -->
+                // getMangaUpdate() is used instead of getMangaDetails() directly:
+                // KeiSource (extlib 1.6) sources only override getMangaUpdate, not
+                // the legacy per-field methods, so calling getMangaDetails() on them
+                // falls through to HttpSource's generic default implementation,
+                // which builds a broken URL for sources that manage their own.
+                val networkManga = state.source.getMangaUpdate(
+                    manga = state.manga.toSManga(),
+                    chapters = emptyList(),
+                    fetchDetails = true,
+                    fetchChapters = false,
+                ).manga
+                // Mizu <--
                 updateManga.awaitUpdateFromSource(state.manga, networkManga, manualFetch)
             }
         } catch (e: Throwable) {
@@ -1102,7 +1114,16 @@ class MangaScreenModel(
         try {
             withIOContext {
                 if (state.source !is MergedSource) {
-                    val chapters = state.source.getChapterList(state.manga.toSManga())
+                    // Mizu -->
+                    // See fetchMangaFromSource() for why getMangaUpdate() is used
+                    // instead of getChapterList() directly.
+                    val chapters = state.source.getMangaUpdate(
+                        manga = state.manga.toSManga(),
+                        chapters = emptyList(),
+                        fetchDetails = false,
+                        fetchChapters = true,
+                    ).chapters
+                    // Mizu <--
 
                     val newChapters = syncChaptersWithSource.await(
                         chapters,
