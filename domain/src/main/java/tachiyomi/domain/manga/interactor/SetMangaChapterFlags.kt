@@ -69,6 +69,20 @@ class SetMangaChapterFlags(
         )
     }
 
+    // Mizu -->
+    suspend fun awaitSetShowChapterThumbnails(manga: Manga, enabled: Boolean): Boolean {
+        return mangaRepository.update(
+            MangaUpdate(
+                id = manga.id,
+                chapterFlags = manga.chapterFlags.setFlag(
+                    if (enabled) Manga.CHAPTER_SHOW_THUMBNAILS else 0L,
+                    Manga.CHAPTER_SHOW_THUMBNAILS,
+                ),
+            ),
+        )
+    }
+    // Mizu <--
+
     suspend fun awaitSetAllFlags(
         mangaId: Long,
         unreadFilter: Long,
@@ -77,6 +91,10 @@ class SetMangaChapterFlags(
         sortingMode: Long,
         sortingDirection: Long,
         displayMode: Long,
+        // Mizu -->
+        showChapterThumbnails: Boolean = false,
+        chapterThumbnailSize: Int = 3,
+        // Mizu <--
     ): Boolean {
         return mangaRepository.update(
             MangaUpdate(
@@ -86,7 +104,17 @@ class SetMangaChapterFlags(
                     .setFlag(bookmarkedFilter, Manga.CHAPTER_BOOKMARKED_MASK)
                     .setFlag(sortingMode, Manga.CHAPTER_SORTING_MASK)
                     .setFlag(sortingDirection, Manga.CHAPTER_SORT_DIR_MASK)
-                    .setFlag(displayMode, Manga.CHAPTER_DISPLAY_MASK),
+                    .setFlag(displayMode, Manga.CHAPTER_DISPLAY_MASK)
+                    // Mizu -->
+                    .setFlag(
+                        if (showChapterThumbnails) Manga.CHAPTER_SHOW_THUMBNAILS else 0L,
+                        Manga.CHAPTER_SHOW_THUMBNAILS,
+                    )
+                    .setFlag(
+                        chapterThumbnailSize.toLong() shl 24,
+                        Manga.CHAPTER_THUMBNAIL_SIZE_MASK,
+                    ),
+                    // Mizu <--
             ),
         )
     }

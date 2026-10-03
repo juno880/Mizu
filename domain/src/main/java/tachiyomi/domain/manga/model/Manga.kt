@@ -79,6 +79,16 @@ data class Manga(
     val displayMode: Long
         get() = chapterFlags and CHAPTER_DISPLAY_MASK
 
+    // Mizu -->
+    val showChapterThumbnails: Boolean
+        get() = chapterFlags and CHAPTER_SHOW_THUMBNAILS != 0L
+
+    val chapterThumbnailSize: Int
+        get() = ((chapterFlags and CHAPTER_THUMBNAIL_SIZE_MASK) shr 24)
+            .toInt()
+            .let { if (it == 0) 3 else it }
+    // Mizu <--
+
     val unreadFilterRaw: Long
         get() = chapterFlags and CHAPTER_UNREAD_MASK
 
@@ -135,6 +145,12 @@ data class Manga(
         const val CHAPTER_DISPLAY_NAME = 0x00000000L
         const val CHAPTER_DISPLAY_NUMBER = 0x00100000L
         const val CHAPTER_DISPLAY_MASK = 0x00100000L
+
+        // Mizu -->
+        const val CHAPTER_SHOW_THUMBNAILS = 0x00400000L
+        // 3 bits, shifted left 24: values 1-7 (0 falls back to default of 3)
+        const val CHAPTER_THUMBNAIL_SIZE_MASK = 0x07000000L
+        // Mizu <--
 
         fun create() = Manga(
             id = -1L,

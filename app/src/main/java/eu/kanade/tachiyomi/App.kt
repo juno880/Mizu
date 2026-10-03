@@ -41,6 +41,7 @@ import eu.kanade.tachiyomi.core.security.PrivacyPreferences
 import eu.kanade.tachiyomi.crash.CrashActivity
 import eu.kanade.tachiyomi.crash.GlobalExceptionHandler
 import eu.kanade.tachiyomi.data.coil.BufferedSourceFetcher
+import eu.kanade.tachiyomi.data.coil.CbzCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverFetcher
 import eu.kanade.tachiyomi.data.coil.MangaCoverKeyer
 import eu.kanade.tachiyomi.data.coil.MangaKeyer
@@ -237,6 +238,9 @@ class App : Application(), DefaultLifecycleObserver, SingletonImageLoader.Factor
                 // SY -->
                 add(PagePreviewFetcher.Factory(callFactoryLazy))
                 // SY <--
+                // Mizu -->
+                add(CbzCoverFetcher.Factory())
+                // Mizu <--
                 // Keyer
                 add(MangaCoverKeyer())
                 add(MangaKeyer())

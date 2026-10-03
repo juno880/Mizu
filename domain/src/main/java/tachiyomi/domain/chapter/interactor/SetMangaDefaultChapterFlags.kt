@@ -23,6 +23,10 @@ class SetMangaDefaultChapterFlags(
                     sortingMode = sortChapterBySourceOrNumber().get(),
                     sortingDirection = sortChapterByAscendingOrDescending().get(),
                     displayMode = displayChapterByNameOrNumber().get(),
+                    // Mizu -->
+                    showChapterThumbnails = showChapterThumbnailsDefault().get(),
+                    chapterThumbnailSize = chapterThumbnailSizeDefault().get(),
+                    // Mizu <--
                 )
             }
         }

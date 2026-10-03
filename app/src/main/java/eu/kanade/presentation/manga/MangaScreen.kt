@@ -60,6 +60,7 @@ import eu.kanade.presentation.manga.components.ExpandableMangaDescription
 import eu.kanade.presentation.manga.components.MangaActionRow
 import eu.kanade.presentation.manga.components.MangaBottomActionMenu
 import eu.kanade.presentation.manga.components.MangaChapterListItem
+import eu.kanade.presentation.manga.components.MangaVolumeListItem
 import eu.kanade.presentation.manga.components.MangaInfoBox
 import eu.kanade.presentation.manga.components.MangaInfoButtons
 import eu.kanade.presentation.manga.components.MangaToolbar
@@ -1053,73 +1054,108 @@ private fun LazyListScope.sharedChapterItems(
                 MissingChapterCountListItem(count = item.count)
             }
             is ChapterList.Item -> {
-MangaChapterListItem(
-                    title = if (manga.displayMode == Manga.CHAPTER_DISPLAY_NUMBER) {
-                        stringResource(
-                            MR.strings.display_mode_chapter,
-                            formatChapterNumber(item.chapter.chapterNumber),
-                        )
-                    } else {
-                        item.chapter.name
-                    },
-                    date = item.chapter.dateUpload
-                        .takeIf { it > 0L }
-                        ?.let {
-                            // SY -->
-                            if (manga.isEhBasedManga()) {
-                                MetadataUtil.EX_DATE_FORMAT
-                                    .format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
-                            } else {
-                                relativeDateText(item.chapter.dateUpload)
-                            }
-                            // SY <--
-                        },
-                    readProgress = item.chapter.lastPageRead
-                        .takeIf {
-                            /* SY --> */(!item.chapter.read || alwaysShowReadingProgress)/* SY <-- */ && it > 0L
+                // Mizu -->
+                val itemTitle = if (manga.displayMode == Manga.CHAPTER_DISPLAY_NUMBER) {
+                    stringResource(
+                        MR.strings.display_mode_chapter,
+                        formatChapterNumber(item.chapter.chapterNumber),
+                    )
+                } else {
+                    item.chapter.name
+                }
+                val itemDate = item.chapter.dateUpload
+                    .takeIf { it > 0L }
+                    ?.let {
+                        if (manga.isEhBasedManga()) {
+                            MetadataUtil.EX_DATE_FORMAT
+                                .format(ZonedDateTime.ofInstant(Instant.ofEpochMilli(it), ZoneId.systemDefault()))
+                        } else {
+                            relativeDateText(item.chapter.dateUpload)
                         }
-                        ?.let {
-                            stringResource(
-                                MR.strings.chapter_progress,
-                                it + 1,
-                            )
-                        },
-                    scanlator = item.chapter.scanlator.takeIf {
-                        !it.isNullOrBlank() /* SY --> */ && item.showScanlator /* SY <-- */
-                    },
-                    // SY -->
-                    sourceName = item.sourceName,
-                    // SY <--
-                    read = item.chapter.read,
-                    bookmark = item.chapter.bookmark,
-                    selected = item.selected,
-                    downloadIndicatorEnabled =
-                    !isAnyChapterSelected && !(mergedData?.manga?.get(item.chapter.mangaId) ?: manga).isLocal(),
-                    downloadStateProvider = { item.downloadState },
-                    downloadProgressProvider = { item.downloadProgress },
-                    chapterSwipeStartAction = chapterSwipeStartAction,
-                    chapterSwipeEndAction = chapterSwipeEndAction,
-                    onLongClick = {
-                        onChapterSelected(item, !item.selected, true)
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                    onClick = {
-                        onChapterItemClick(
-                            chapterItem = item,
-                            isAnyChapterSelected = isAnyChapterSelected,
-                            onToggleSelection = { onChapterSelected(item, !item.selected, false) },
-                            onChapterClicked = onChapterClicked,
+                    }
+                val itemReadProgress = item.chapter.lastPageRead
+                    .takeIf {
+                        (!item.chapter.read || alwaysShowReadingProgress) && it > 0L
+                    }
+                    ?.let {
+                        stringResource(
+                            MR.strings.chapter_progress,
+                            it + 1,
                         )
-                    },
-                    onDownloadClick = if (onDownloadChapter != null) {
-                        { onDownloadChapter(listOf(item), it) }
-                    } else {
-                        null
-                    },
-                    onChapterSwipe = {
-                        onChapterSwipe(item, it)
-                    },
-                )
+                    }
+                val itemScanlator = item.chapter.scanlator.takeIf {
+                    !it.isNullOrBlank() && item.showScanlator
+                }
+                val itemDownloadIndicatorEnabled =
+                    !isAnyChapterSelected && !(mergedData?.manga?.get(item.chapter.mangaId) ?: manga).isLocal()
+                val itemOnLongClick = {
+                    onChapterSelected(item, !item.selected, true)
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                }
+                val itemOnClick = {
+                    onChapterItemClick(
+                        chapterItem = item,
+                        isAnyChapterSelected = isAnyChapterSelected,
+                        onToggleSelection = { onChapterSelected(item, !item.selected, false) },
+                        onChapterClicked = onChapterClicked,
+                    )
+                }
+                val itemOnDownloadClick = if (onDownloadChapter != null) {
+                    { action: ChapterDownloadAction -> onDownloadChapter(listOf(item), action) }
+                } else {
+                    null
+                }
+                val itemOnChapterSwipe = { action: LibraryPreferences.ChapterSwipeAction ->
+                    onChapterSwipe(item, action)
+                }
+
+                if (manga.showChapterThumbnails) {
+                    MangaVolumeListItem(
+                        title = itemTitle,
+                        date = itemDate,
+                        readProgress = itemReadProgress,
+                        scanlator = itemScanlator,
+                        sourceName = item.sourceName,
+                        read = item.chapter.read,
+                        bookmark = item.chapter.bookmark,
+                        selected = item.selected,
+                        downloadIndicatorEnabled = itemDownloadIndicatorEnabled,
+                        downloadStateProvider = { item.downloadState },
+                        downloadProgressProvider = { item.downloadProgress },
+                        chapterSwipeStartAction = chapterSwipeStartAction,
+                        chapterSwipeEndAction = chapterSwipeEndAction,
+                        onLongClick = itemOnLongClick,
+                        onClick = itemOnClick,
+                        onDownloadClick = itemOnDownloadClick,
+                        onChapterSwipe = itemOnChapterSwipe,
+                        mangaId = manga.id,
+                        sourceId = manga.source,
+                        chapterUrl = item.chapter.url,
+                        uri = null,
+                        thumbnailSize = manga.chapterThumbnailSize,
+                    )
+                } else {
+                    MangaChapterListItem(
+                        title = itemTitle,
+                        date = itemDate,
+                        readProgress = itemReadProgress,
+                        scanlator = itemScanlator,
+                        sourceName = item.sourceName,
+                        read = item.chapter.read,
+                        bookmark = item.chapter.bookmark,
+                        selected = item.selected,
+                        downloadIndicatorEnabled = itemDownloadIndicatorEnabled,
+                        downloadStateProvider = { item.downloadState },
+                        downloadProgressProvider = { item.downloadProgress },
+                        chapterSwipeStartAction = chapterSwipeStartAction,
+                        chapterSwipeEndAction = chapterSwipeEndAction,
+                        onLongClick = itemOnLongClick,
+                        onClick = itemOnClick,
+                        onDownloadClick = itemOnDownloadClick,
+                        onChapterSwipe = itemOnChapterSwipe,
+                    )
+                }
+                // Mizu <--
             }
         }
     }

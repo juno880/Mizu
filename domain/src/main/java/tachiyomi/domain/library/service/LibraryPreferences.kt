@@ -166,6 +166,18 @@ class LibraryPreferences(
         Manga.CHAPTER_DISPLAY_NAME,
     )
 
+    // Mizu -->
+    fun showChapterThumbnailsDefault() = preferenceStore.getBoolean(
+        "default_show_chapter_thumbnails",
+        false,
+    )
+
+    fun chapterThumbnailSizeDefault() = preferenceStore.getInt(
+        "default_chapter_thumbnail_size",
+        3,
+    )
+    // Mizu <--
+
     fun sortChapterByAscendingOrDescending() = preferenceStore.getLong(
         "default_chapter_sort_by_ascending_or_descending",
         Manga.CHAPTER_SORT_DESC,
@@ -180,6 +192,10 @@ class LibraryPreferences(
         sortChapterByAscendingOrDescending().set(
             if (manga.sortDescending()) Manga.CHAPTER_SORT_DESC else Manga.CHAPTER_SORT_ASC,
         )
+        // Mizu -->
+        showChapterThumbnailsDefault().set(manga.showChapterThumbnails)
+        chapterThumbnailSizeDefault().set(manga.chapterThumbnailSize)
+        // Mizu <--
     }
 
     fun autoClearChapterCache() = preferenceStore.getBoolean("auto_clear_chapter_cache", false)

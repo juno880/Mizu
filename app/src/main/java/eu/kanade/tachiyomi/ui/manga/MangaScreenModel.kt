@@ -1511,6 +1511,16 @@ class MangaScreenModel(
         }
     }
 
+    // Mizu -->
+    fun setShowChapterThumbnails(enabled: Boolean) {
+        val manga = successState?.manga ?: return
+
+        screenModelScope.launchNonCancellable {
+            setMangaChapterFlags.awaitSetShowChapterThumbnails(manga, enabled)
+        }
+    }
+    // Mizu <--
+
     /**
      * Sets the sorting method and requests an UI update.
      * @param sort the sorting mode.

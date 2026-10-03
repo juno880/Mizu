@@ -57,6 +57,9 @@ fun ChapterSettingsDialog(
     onDisplayModeChanged: (Long) -> Unit,
     onSetAsDefault: (applyToExistingManga: Boolean) -> Unit,
     onResetToDefault: () -> Unit,
+    // Mizu -->
+    onShowChapterThumbnailsChanged: (Boolean) -> Unit,
+    // Mizu <--
 ) {
     var showSetAsDefaultDialog by rememberSaveable { mutableStateOf(false) }
     if (showSetAsDefaultDialog) {
@@ -122,6 +125,10 @@ fun ChapterSettingsDialog(
                     DisplayPage(
                         displayMode = manga?.displayMode ?: 0,
                         onItemSelected = onDisplayModeChanged,
+                        // Mizu -->
+                        showChapterThumbnails = manga?.showChapterThumbnails ?: false,
+                        onShowChapterThumbnailsChanged = onShowChapterThumbnailsChanged,
+                        // Mizu <--
                     )
                 }
             }
@@ -214,6 +221,10 @@ private fun ColumnScope.SortPage(
 private fun ColumnScope.DisplayPage(
     displayMode: Long,
     onItemSelected: (Long) -> Unit,
+    // Mizu -->
+    showChapterThumbnails: Boolean,
+    onShowChapterThumbnailsChanged: (Boolean) -> Unit,
+    // Mizu <--
 ) {
     listOf(
         MR.strings.show_title to Manga.CHAPTER_DISPLAY_NAME,
@@ -225,6 +236,13 @@ private fun ColumnScope.DisplayPage(
             onClick = { onItemSelected(mode) },
         )
     }
+    // Mizu -->
+    LabeledCheckbox(
+        label = stringResource(MR.strings.chapter_thumbnails),
+        checked = showChapterThumbnails,
+        onCheckedChange = onShowChapterThumbnailsChanged,
+    )
+    // Mizu <--
 }
 
 @Composable

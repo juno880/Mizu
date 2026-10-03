@@ -298,6 +298,9 @@ class MangaScreen(
                 onResetToDefault = screenModel::resetToDefaultSettings,
                 scanlatorFilterActive = successState.scanlatorFilterActive,
                 onScanlatorFilterClicked = { showScanlatorsDialog = true },
+                // Mizu -->
+                onShowChapterThumbnailsChanged = screenModel::setShowChapterThumbnails,
+                // Mizu <--
             )
             MangaScreenModel.Dialog.TrackSheet -> {
                 NavigatorAdaptiveSheet(

@@ -1,28 +1,23 @@
 package eu.kanade.presentation.manga.components
 
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Circle
-import androidx.compose.material.icons.outlined.BookmarkAdd
-import androidx.compose.material.icons.outlined.BookmarkRemove
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.Done
-import androidx.compose.material.icons.outlined.Download
-import androidx.compose.material.icons.outlined.FileDownloadOff
-import androidx.compose.material.icons.outlined.RemoveDone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
-import androidx.compose.material3.contentColorFor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -30,12 +25,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.graphics.painter.ColorPainter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.rememberAsyncImagePainter
+import eu.kanade.tachiyomi.data.coil.CbzCoverData
 import eu.kanade.tachiyomi.data.download.model.Download
 import me.saket.swipe.SwipeableActionsBox
 import tachiyomi.domain.library.service.LibraryPreferences
@@ -44,16 +43,25 @@ import tachiyomi.presentation.core.components.material.DISABLED_ALPHA
 import tachiyomi.presentation.core.components.material.SECONDARY_ALPHA
 import tachiyomi.presentation.core.i18n.stringResource
 import tachiyomi.presentation.core.util.selectedBackground
+import tachiyomi.domain.manga.model.MangaCover as MangaCoverModel
 
+/**
+ * Same row layout as [MangaChapterListItem], with a cover thumbnail added at the
+ * start. Used instead of [MangaChapterListItem] when the manga has
+ * `showChapterThumbnails` enabled.
+ *
+ * The thumbnail is resolved from [chapterUrl]: for HTTP sources (e.g. Komga),
+ * it reuses the existing authenticated cover-fetching pathway pointed at
+ * `$chapterUrl/thumbnail`. For local chapters, it reads the first image out of
+ * the chapter's own .cbz file via [uri] and [CbzCoverData].
+ */
 @Composable
-fun MangaChapterListItem(
+fun MangaVolumeListItem(
     title: String,
     date: String?,
     readProgress: String?,
     scanlator: String?,
-    // SY -->
     sourceName: String?,
-    // SY <--
     read: Boolean,
     bookmark: Boolean,
     selected: Boolean,
@@ -66,6 +74,13 @@ fun MangaChapterListItem(
     onClick: () -> Unit,
     onDownloadClick: ((ChapterDownloadAction) -> Unit)?,
     onChapterSwipe: (LibraryPreferences.ChapterSwipeAction) -> Unit,
+    // Mizu -->
+    mangaId: Long,
+    sourceId: Long,
+    chapterUrl: String,
+    uri: Uri?,
+    thumbnailSize: Int,
+    // Mizu <--
     modifier: Modifier = Modifier,
 ) {
     val start = getSwipeAction(
@@ -85,6 +100,31 @@ fun MangaChapterListItem(
         onSwipe = { onChapterSwipe(chapterSwipeEndAction) },
     )
 
+    // Mizu -->
+    val thumbnailModel = remember(chapterUrl, uri) {
+        when {
+            chapterUrl.startsWith("http") -> MangaCoverModel(
+                mangaId = mangaId,
+                sourceId = sourceId,
+                isMangaFavorite = false,
+                ogUrl = "$chapterUrl/thumbnail",
+                lastModified = 0L,
+            )
+            uri != null -> {
+                val parts = chapterUrl.split("/")
+                if (parts.size >= 2) {
+                    val fileUri = Uri.withAppendedPath(Uri.withAppendedPath(uri, parts[0]), parts[1])
+                    CbzCoverData(fileUri)
+                } else {
+                    null
+                }
+            }
+            else -> null
+        }
+    }
+    val thumbnailHeight = ((thumbnailSize * 18) + 40).dp
+    // Mizu <--
+
     SwipeableActionsBox(
         modifier = Modifier.clipToBounds(),
         startActions = listOfNotNull(start),
@@ -99,8 +139,41 @@ fun MangaChapterListItem(
                     onClick = onClick,
                     onLongClick = onLongClick,
                 )
-                .padding(start = 16.dp, top = 12.dp, end = 8.dp, bottom = 12.dp),
+                .padding(start = 16.dp, top = 0.dp, end = 8.dp, bottom = 0.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Mizu -->
+            // A plain AsyncImage with no width constraint measures at the
+            // image's full intrinsic pixel size, which can blow out the Row
+            // and push the text out of view. Instead, read the real aspect
+            // ratio from the painter once available (falling back to a
+            // standard book ratio before it loads) and apply that via
+            // aspectRatio(), so the composable always has a bounded,
+            // well-defined width during layout.
+            val painter = rememberAsyncImagePainter(
+                model = thumbnailModel,
+                placeholder = ColorPainter(MaterialTheme.colorScheme.surfaceContainerHighest),
+                error = ColorPainter(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentScale = ContentScale.Fit,
+            )
+            val intrinsicSize = painter.intrinsicSize
+            val aspectRatio = if (intrinsicSize.isSpecified && intrinsicSize.height > 0f) {
+                intrinsicSize.width / intrinsicSize.height
+            } else {
+                2f / 3f
+            }
+            Image(
+                painter = painter,
+                contentDescription = null,
+                modifier = Modifier
+                    .height(thumbnailHeight)
+                    .aspectRatio(aspectRatio)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .padding(end = 12.dp),
+                contentScale = ContentScale.Fit,
+            )
+            // Mizu <--
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -152,10 +225,7 @@ fun MangaChapterListItem(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
-                            if (readProgress != null ||
-                                scanlator != null/* SY --> */ ||
-                                sourceName != null/* SY <-- */
-                            ) {
+                            if (readProgress != null || scanlator != null || sourceName != null) {
                                 DotSeparatorText()
                             }
                         }
@@ -166,9 +236,8 @@ fun MangaChapterListItem(
                                 overflow = TextOverflow.Ellipsis,
                                 color = LocalContentColor.current.copy(alpha = DISABLED_ALPHA),
                             )
-                            if (scanlator != null/* SY --> */ || sourceName != null/* SY <-- */) DotSeparatorText()
+                            if (scanlator != null || sourceName != null) DotSeparatorText()
                         }
-                        // SY -->
                         if (sourceName != null) {
                             Text(
                                 text = sourceName,
@@ -177,7 +246,6 @@ fun MangaChapterListItem(
                             )
                             if (scanlator != null) DotSeparatorText()
                         }
-                        // SY <--
                         if (scanlator != null) {
                             Text(
                                 text = scanlator,
@@ -199,60 +267,3 @@ fun MangaChapterListItem(
         }
     }
 }
-
-internal fun getSwipeAction(
-    action: LibraryPreferences.ChapterSwipeAction,
-    read: Boolean,
-    bookmark: Boolean,
-    downloadState: Download.State,
-    background: Color,
-    onSwipe: () -> Unit,
-): me.saket.swipe.SwipeAction? {
-    return when (action) {
-        LibraryPreferences.ChapterSwipeAction.ToggleRead -> swipeAction(
-            icon = if (!read) Icons.Outlined.Done else Icons.Outlined.RemoveDone,
-            background = background,
-            isUndo = read,
-            onSwipe = onSwipe,
-        )
-        LibraryPreferences.ChapterSwipeAction.ToggleBookmark -> swipeAction(
-            icon = if (!bookmark) Icons.Outlined.BookmarkAdd else Icons.Outlined.BookmarkRemove,
-            background = background,
-            isUndo = bookmark,
-            onSwipe = onSwipe,
-        )
-        LibraryPreferences.ChapterSwipeAction.Download -> swipeAction(
-            icon = when (downloadState) {
-                Download.State.NOT_DOWNLOADED, Download.State.ERROR -> Icons.Outlined.Download
-                Download.State.QUEUE, Download.State.DOWNLOADING -> Icons.Outlined.FileDownloadOff
-                Download.State.DOWNLOADED -> Icons.Outlined.Delete
-            },
-            background = background,
-            onSwipe = onSwipe,
-        )
-        LibraryPreferences.ChapterSwipeAction.Disabled -> null
-    }
-}
-
-internal fun swipeAction(
-    onSwipe: () -> Unit,
-    icon: ImageVector,
-    background: Color,
-    isUndo: Boolean = false,
-): me.saket.swipe.SwipeAction {
-    return me.saket.swipe.SwipeAction(
-        icon = {
-            Icon(
-                modifier = Modifier.padding(16.dp),
-                imageVector = icon,
-                tint = contentColorFor(background),
-                contentDescription = null,
-            )
-        },
-        background = background,
-        onSwipe = onSwipe,
-        isUndo = isUndo,
-    )
-}
-
-internal val swipeActionThreshold = 56.dp
