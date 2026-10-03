@@ -48,6 +48,12 @@
 -keepclasseswithmembers class okhttp3.MultipartBody$Builder { *; }
 ##---------------End: proguard configuration for okhttp  ----------
 
+# Mizu: extension-lib 1.6 (KeiSource) extensions decode Zstd responses through
+# com.squareup.zstd.okio.OkioZstd (pulled in by okhttp-zstd). The app itself never
+# references it, so R8 strips it from release builds and the extension crashes with
+# NoClassDefFoundError. Keep the whole library (it also contains JNI entry points).
+-keep class com.squareup.zstd.** { *; }
+
 ##---------------Begin: proguard configuration for kotlinx.serialization  ----------
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.** # core serialization annotations

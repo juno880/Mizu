@@ -46,6 +46,14 @@ sealed class Extension {
         val apkName: String,
         val iconUrl: String,
         val repoUrl: String,
+        // Mizu -->
+        // The full APK download URL, when known exactly (from the new store
+        // format). When set, this is used as-is instead of reconstructing a
+        // URL from repoUrl + apkName, since the new format's real hosting
+        // path isn't guaranteed to match the legacy "$repoUrl/apk/$name"
+        // convention.
+        val fullApkUrl: String? = null,
+        // Mizu <--
     ) : Extension() {
 
         data class Source(

@@ -239,7 +239,10 @@ internal class ExtensionApi {
     }
 
     fun getApkUrl(extension: Extension.Available): String {
-        return "${extension.repoUrl}/apk/${extension.apkName}"
+        // Mizu: use the known full URL when available (new store format)
+        // instead of always reconstructing one, which can point at the wrong
+        // location if the real hosting path doesn't match this convention.
+        return extension.fullApkUrl ?: "${extension.repoUrl}/apk/${extension.apkName}"
     }
 
     private fun ExtensionJsonObject.extractLibVersion(): Double {
@@ -345,6 +348,9 @@ private data class ExtensionListObject(
                     apkName = ext.resources.apkUrl.substringAfterLast('/'),
                     iconUrl = ext.resources.iconUrl,
                     repoUrl = repoUrl,
+                    // Mizu -->
+                    fullApkUrl = ext.resources.apkUrl,
+                    // Mizu <--
                 )
             }
     }
